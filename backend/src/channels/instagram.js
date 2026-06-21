@@ -1,22 +1,21 @@
 /**
  * Instagram channel publisher — NOT YET IMPLEMENTED.
  *
- * Same interface as every other channel module:
- *   isConfigured() -> boolean
- *   publish(text)  -> { ok, ...details }
+ *   isConfigured(creds) -> boolean
+ *   publish(text, creds) -> { ok, ...details }
  *
- * Instagram posting goes through the Instagram Graph API and requires
- * a connected Facebook Business/Creator account, plus (for anything
- * beyond pure text) generated images — Instagram doesn't support
- * text-only posts, so this channel will likely depend on the image
- * generation feature once that's built.
+ * `creds` will hold a per-user Instagram Graph API access token + account
+ * id, obtained via Facebook Login (Instagram posting requires a connected
+ * Facebook Business/Creator account). Instagram doesn't support text-only
+ * posts, so this channel will likely depend on the image generation
+ * feature once that's built.
  */
-function isConfigured() {
-  return !!(process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_ACCOUNT_ID);
+function isConfigured(creds = {}) {
+  return !!(creds.accessToken && creds.accountId);
 }
 
-async function publish(text) {
-  if (!isConfigured()) {
+async function publish(text, creds) {
+  if (!isConfigured(creds)) {
     return { ok: false, simulated: true, reason: "not_configured" };
   }
   // TODO: implement real Instagram Graph API call here (requires media).

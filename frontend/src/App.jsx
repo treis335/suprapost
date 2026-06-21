@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 
 /* ============================================================
    DESIGN SYSTEM — "Pulse" v2
@@ -36,23 +37,33 @@ const C = {
 const fmt = (n) => Number(n ?? 0).toFixed(2);
 
 /* ============================================================
-   API CLIENT
+   API CLIENT — attaches the wallet session JWT to every request.
+   A 401 means the session expired or was never valid; callers can
+   check `unauthorized` on the result and bounce back to the login screen.
 ============================================================ */
+function authHeaders() {
+  const session = getSession();
+  return session?.token ? { Authorization: `Bearer ${session.token}` } : {};
+}
+
 const api = {
   async get(path) {
-    const res = await fetch(`/api${path}`);
+    const res = await fetch(`/api${path}`, { headers: { ...authHeaders() } });
+    if (res.status === 401) return { unauthorized: true };
     return res.json();
   },
   async post(path, body) {
     const res = await fetch(`/api${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(body || {}),
     });
+    if (res.status === 401) return { unauthorized: true };
     return res.json();
   },
   async del(path) {
-    const res = await fetch(`/api${path}`, { method: "DELETE" });
+    const res = await fetch(`/api${path}`, { method: "DELETE", headers: { ...authHeaders() } });
+    if (res.status === 401) return { unauthorized: true };
     return res.json();
   },
 };
@@ -337,56 +348,204 @@ const CHANNEL_ICONS = {
   discord: "◆",
 };
 
+// Which credential fields each channel needs, and whether it's even
+// possible to configure yet (Twitter/Instagram need real OAuth — until
+// that's built, editing credentials for them is disabled with a note).
+const CHANNEL_FIELDS = {
+  telegram: {
+    oauthOnly: false,
+    fields: [
+      { key: "botToken", label: "Bot Token", placeholder: "123456:ABC-DEF...", type: "password" },
+      { key: "chatId", label: "Chat ID", placeholder: "987654321", type: "text" },
+    ],
+    help: "Get a bot token from @BotFather on Telegram. For the chat id: message your bot once, then visit https://api.telegram.org/bot<TOKEN>/getUpdates and look for \"chat\":{\"id\": ...}.",
+  },
+  discord: {
+    oauthOnly: false,
+    fields: [
+      { key: "webhookUrl", label: "Webhook URL", placeholder: "https://discord.com/api/webhooks/...", type: "password" },
+    ],
+    help: "In Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy URL.",
+  },
+  twitter: { oauthOnly: true, fields: [], help: "Twitter/X connects via OAuth — coming soon." },
+  instagram: { oauthOnly: true, fields: [], help: "Instagram connects via Facebook Login — coming soon." },
+};
+
 /**
  * One row per platform. Shows connection state clearly:
  *  - not connected: dimmed, "not configured" pill, toggle disabled
  *  - connected but disabled: toggle off, user can opt-in
  *  - connected and enabled: toggle on, glowing pill
+ * Click the row to expand credential fields (for non-OAuth channels).
  */
-function ChannelRow({ id, channel, onToggle }) {
+function ChannelRow({ id, channel, onToggle, onSaveCredentials }) {
   const { label, connected, enabled } = channel;
+  const [expanded, setExpanded] = useState(false);
+  const config = CHANNEL_FIELDS[id] || { oauthOnly: true, fields: [], help: "" };
+  const [formValues, setFormValues] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    await onSaveCredentials(id, formValues);
+    setSaving(false);
+    setFormValues({});
+  }
+
   return (
     <div style={{
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "13px 15px", borderRadius: 12, background: C.bg,
+      borderRadius: 12, background: C.bg,
       border: `1px solid ${enabled && connected ? C.accent + "44" : C.border}`,
-      opacity: connected ? 1 : 0.55, transition: "all 0.2s",
+      opacity: connected || expanded ? 1 : 0.7, transition: "all 0.2s", overflow: "hidden",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{
-          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: enabled && connected ? `${C.accent}22` : C.surface2,
-          color: enabled && connected ? C.accent : C.muted,
-          fontSize: "1rem", fontFamily: C.display,
-        }}>{CHANNEL_ICONS[id] || "●"}</div>
-        <div>
-          <div style={{ fontSize: "0.84rem", fontWeight: 600 }}>{label}</div>
-          <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 2 }}>
-            {connected ? (enabled ? "broadcasting" : "connected · paused") : "not configured"}
+      <div
+        onClick={() => !config.oauthOnly && setExpanded((e) => !e)}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 15px", cursor: config.oauthOnly ? "default" : "pointer" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: enabled && connected ? `${C.accent}22` : C.surface2,
+            color: enabled && connected ? C.accent : C.muted,
+            fontSize: "1rem", fontFamily: C.display,
+          }}>{CHANNEL_ICONS[id] || "●"}</div>
+          <div>
+            <div style={{ fontSize: "0.84rem", fontWeight: 600 }}>{label}</div>
+            <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 2 }}>
+              {config.oauthOnly ? "coming soon" : connected ? (enabled ? "broadcasting" : "connected · paused") : "tap to configure"}
+            </div>
           </div>
         </div>
-      </div>
-      <label style={{ position: "relative", display: "inline-block", width: 40, height: 23, flexShrink: 0, cursor: connected ? "pointer" : "not-allowed" }}>
-        <input
-          type="checkbox"
-          checked={enabled}
-          disabled={!connected}
-          onChange={(e) => onToggle(id, e.target.checked)}
-          style={{ opacity: 0, width: 0, height: 0 }}
-        />
-        <span style={{
-          position: "absolute", inset: 0, borderRadius: 23,
-          background: enabled && connected ? C.accent : C.border,
-          transition: "background 0.2s",
-        }}>
+        <label
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: "relative", display: "inline-block", width: 40, height: 23, flexShrink: 0, cursor: connected ? "pointer" : "not-allowed" }}
+        >
+          <input
+            type="checkbox"
+            checked={enabled}
+            disabled={!connected}
+            onChange={(e) => onToggle(id, e.target.checked)}
+            style={{ opacity: 0, width: 0, height: 0 }}
+          />
           <span style={{
-            position: "absolute", top: 3, left: enabled ? 20 : 3,
-            width: 17, height: 17, borderRadius: "50%", background: "#fff",
-            transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-          }} />
-        </span>
-      </label>
+            position: "absolute", inset: 0, borderRadius: 23,
+            background: enabled && connected ? C.accent : C.border,
+            transition: "background 0.2s",
+          }}>
+            <span style={{
+              position: "absolute", top: 3, left: enabled ? 20 : 3,
+              width: 17, height: 17, borderRadius: "50%", background: "#fff",
+              transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+            }} />
+          </span>
+        </label>
+      </div>
+
+      {expanded && !config.oauthOnly && (
+        <div className="fade-up" style={{ padding: "0 15px 15px" }}>
+          <div style={{ height: 1, background: C.border, marginBottom: 13 }} />
+          {config.fields.map((f) => (
+            <div key={f.key} style={{ marginBottom: 10 }}>
+              <Input
+                type={f.type}
+                placeholder={f.placeholder}
+                value={formValues[f.key] ?? ""}
+                onChange={(e) => setFormValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                style={{ fontSize: "0.8rem" }}
+              />
+            </div>
+          ))}
+          <div style={{ fontSize: "0.65rem", color: C.muted, lineHeight: 1.6, marginBottom: 12 }}>{config.help}</div>
+          <Btn variant="primary" size="sm" onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : connected ? "Update credentials" : "Save & Connect"}
+          </Btn>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   LOGIN SCREEN — wallet-based sign-in, no passwords or emails.
+   Connect StarKey -> sign a one-time message -> backend verifies and
+   issues a session. This IS the account system: the wallet address is
+   the user ID.
+============================================================ */
+function LoginScreen({ onSignedIn, isMobile }) {
+  const [installed, setInstalled] = useState(null); // null = checking
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    waitForStarKey().then(setInstalled);
+  }, []);
+
+  async function handleConnect() {
+    setError(""); setConnecting(true);
+    try {
+      const session = await signInWithWallet();
+      onSignedIn(session);
+    } catch (err) {
+      setError(err.message || "Sign-in failed");
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  return (
+    <div style={{ background: C.bgGrad, color: C.text, minHeight: "100vh", fontFamily: C.sans, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <GlobalStyle />
+      <div className="scale-in" style={{ width: "100%", maxWidth: 420 }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ fontWeight: 700, fontSize: isMobile ? "1.6rem" : "1.9rem", fontFamily: C.display, letterSpacing: "-0.02em" }}>
+            Supra<span style={{ color: C.accent }}>Post</span>
+          </div>
+          <div style={{ fontSize: "0.84rem", color: C.muted, marginTop: 8 }}>AI social automation, paid for in SUPRA</div>
+        </div>
+
+        <Card accentTop={C.accent} style={{ textAlign: "center", padding: isMobile ? "28px 22px" : "36px 30px" }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: 18, margin: "0 auto 20px",
+            background: `linear-gradient(135deg, ${C.accent}, ${C.accentDeep})`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "1.8rem", boxShadow: `0 8px 24px -8px ${C.accent}88`,
+          }}>⬡</div>
+
+          <div style={{ fontSize: "1.05rem", fontWeight: 600, fontFamily: C.display, marginBottom: 8 }}>
+            Sign in with your Supra wallet
+          </div>
+          <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6, marginBottom: 26 }}>
+            No password, no email. Your wallet address is your account —
+            connect once and sign a free message to prove it's yours.
+          </div>
+
+          {installed === false && (
+            <div style={{ fontSize: "0.78rem", color: C.warn, background: `${C.warn}14`, border: `1px solid ${C.warn}33`, borderRadius: 10, padding: 12, marginBottom: 16, lineHeight: 1.6 }}>
+              StarKey wallet not detected. Install the extension from{" "}
+              <a href="https://starkey.app" target="_blank" rel="noreferrer" style={{ color: C.warn }}>starkey.app</a>, then reload this page.
+            </div>
+          )}
+
+          {error && (
+            <div style={{ fontSize: "0.78rem", color: C.danger, background: `${C.danger}14`, border: `1px solid ${C.danger}33`, borderRadius: 10, padding: 12, marginBottom: 16 }}>
+              {error}
+            </div>
+          )}
+
+          <Btn
+            full variant="primary" size="lg"
+            onClick={handleConnect}
+            disabled={connecting || installed === null}
+          >
+            {connecting ? "Confirm in StarKey..." : installed === null ? "Checking for wallet..." : "Connect Wallet"}
+          </Btn>
+
+          <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 16, lineHeight: 1.6 }}>
+            This only signs a message — it never triggers a transaction or costs gas.
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -399,6 +558,9 @@ export default function App() {
   const isCompact = isMobile || isTablet; // shared layout rules for <1080
   const [tab, setTab] = useState("setup");
   const [backendOk, setBackendOk] = useState(true);
+
+  const [session, setSession] = useState(() => getSession());
+  const [authReady, setAuthReady] = useState(false);
 
   const [settings, setSettings] = useState({ niche: "", tone: "technical", audience: "", examples: "", avoid: "", postType: "alpha", customPrompt: "" });
   const [wallet, setWallet] = useState({ balance: 0, costPerPost: 1 });
@@ -417,23 +579,31 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const cdRef = useRef(null);
 
+  function handleSignOut() {
+    clearSession();
+    setSession(null);
+  }
+
   const refreshAll = useCallback(async () => {
+    if (!session) return;
     try {
       const [s, w, a, p, st, ch] = await Promise.all([
         api.get("/settings"), api.get("/wallet"), api.get("/automation"), api.get("/posts"), api.get("/stats"), api.get("/channels"),
       ]);
+      if (s.unauthorized) { handleSignOut(); return; }
       setSettings(s); setWallet(w); setAutomation(a); setPosts(p); setStats(st); setChannels(ch);
       setBackendOk(true);
     } catch {
       setBackendOk(false);
     }
-  }, []);
+  }, [session]);
 
   useEffect(() => {
+    if (!session) return;
     refreshAll();
     const interval = setInterval(refreshAll, 5000);
     return () => clearInterval(interval);
-  }, [refreshAll]);
+  }, [refreshAll, session]);
 
   useEffect(() => {
     if (cdRef.current) clearInterval(cdRef.current);
@@ -454,6 +624,12 @@ export default function App() {
   async function saveSettings() { const updated = await api.post("/settings", settings); setSettings(updated); }
   async function topUp(amount = 10) { const w = await api.post("/wallet/topup", { amount }); setWallet(w); }
   async function toggleChannel(id, enabled) { const updated = await api.post(`/channels/${id}`, { enabled }); setChannels(updated); }
+  async function saveChannelCredentials(id, credentials) {
+    // saving credentials also auto-enables the channel, so the user doesn't
+    // have to save then separately flip the toggle
+    const updated = await api.post(`/channels/${id}`, { enabled: true, credentials });
+    setChannels(updated);
+  }
 
   async function handleGenerate() {
     setGenerating(true); setTweet(""); setScores([]); setGenLog([]);
@@ -500,6 +676,16 @@ export default function App() {
         </div>
       )}
 
+      <Card eyebrow="Identity" title="Account" accentTop={C.accent2}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: "0.7rem", color: C.muted, marginBottom: 4 }}>Signed in with</div>
+            <div style={{ fontFamily: C.mono, fontSize: "0.86rem", color: C.text }}>{session.address}</div>
+          </div>
+          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
+        </div>
+      </Card>
+
       <Card eyebrow="Status" title="Backend Connection" right={<ConnStatus ok={backendOk} />}>
         <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6 }}>
           {backendOk
@@ -511,7 +697,7 @@ export default function App() {
       <Card eyebrow={`Broadcast · ${enabledChannelCount} active`} title="Channels" accentTop={C.accent}>
         <div style={{ display: "grid", gridTemplateColumns: channelGridCols, gap: 10, marginBottom: 4 }}>
           {Object.entries(channels).map(([id, ch]) => (
-            <ChannelRow key={id} id={id} channel={ch} onToggle={toggleChannel} />
+            <ChannelRow key={id} id={id} channel={ch} onToggle={toggleChannel} onSaveCredentials={saveChannelCredentials} />
           ))}
         </div>
         <div style={{ fontSize: "0.68rem", color: C.muted, marginTop: 12, lineHeight: 1.6 }}>
@@ -748,6 +934,13 @@ export default function App() {
   const panels = { setup: Setup, generate: Generate, automation: Automation, history: History };
 
   /* ============================================================
+     AUTH GATE — show the wallet sign-in screen until we have a session
+  ============================================================ */
+  if (!session) {
+    return <LoginScreen onSignedIn={setSession} isMobile={isMobile} />;
+  }
+
+  /* ============================================================
      LAYOUTS
   ============================================================ */
   if (isMobile) {
@@ -757,6 +950,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.85)", backdropFilter: "blur(10px)", position: "sticky", top: 0, zIndex: 100 }}>
           <div style={{ fontWeight: 700, fontSize: "1.1rem", fontFamily: C.display }}>Supra<span style={{ color: C.accent }}>Post</span></div>
           <div style={{ display: "flex", gap: 7 }}>
+            <Pill color={C.accent2}>{shortAddress(session.address)}</Pill>
             <Pill color={C.supra}>⬡ {fmt(wallet.balance)}</Pill>
             <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "ON" : "OFF"}</Pill>
           </div>
@@ -832,6 +1026,8 @@ export default function App() {
           <ConnStatus ok={backendOk} />
           <Pill color={C.supra}>⬡ {fmt(wallet.balance)} SUPRA</Pill>
           <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Automation active" : "Idle"}</Pill>
+          <Pill color={C.accent2}>{shortAddress(session.address)}</Pill>
+          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
         </div>
       </div>
 

@@ -3,7 +3,8 @@ const { generatePost, scorePost } = require("./deepseek");
 const { publishToChannels } = require("./channels");
 
 /**
- * Runs one full generation cycle:
+ * Runs one full generation cycle for a specific user (identified by their
+ * wallet address):
  *  1. Check SUPRA balance
  *  2. Deduct cost
  *  3. Generate text via DeepSeek
@@ -12,15 +13,16 @@ const { publishToChannels } = require("./channels");
  *
  * Returns the created post object (whether published or just drafted).
  */
-async function runGenerationCycle(db, { autoPost }) {
+async function runGenerationCycle(db, address, { autoPost }) {
   const log = [];
   const push = (msg) => {
     log.push({ time: new Date().toISOString(), msg });
-    console.log(`[engine] ${msg}`);
+    console.log(`[engine:${address}] ${msg}`);
   };
 
   await db.read();
-  const { wallet, settings, channels } = db.data;
+  const user = db.forUser(address);
+  const { wallet, settings, channels } = user;
 
   if (wallet.balance < wallet.costPerPost) {
     push("✕ Insufficient SUPRA balance — cycle aborted");
@@ -29,7 +31,7 @@ async function runGenerationCycle(db, { autoPost }) {
 
   // 1. charge
   wallet.balance = +(wallet.balance - wallet.costPerPost).toFixed(2);
-  db.data.stats.supraEarned = +(db.data.stats.supraEarned + wallet.costPerPost).toFixed(2);
+  user.stats.supraEarned = +(user.stats.supraEarned + wallet.costPerPost).toFixed(2);
   push(`⬡ Charged ${wallet.costPerPost} SUPRA — balance now ${wallet.balance}`);
 
   // 2. generate
@@ -41,7 +43,7 @@ async function runGenerationCycle(db, { autoPost }) {
   const { scores, avg } = scorePost();
   push(`🧠 Self-critique score: ${avg}/10`);
 
-  db.data.stats.totalGenerations += 1;
+  user.stats.totalGenerations += 1;
 
   const post = {
     id: uuidv4(),
@@ -71,10 +73,10 @@ async function runGenerationCycle(db, { autoPost }) {
       }
     }
     const anyPosted = Object.values(post.results).some((r) => r.ok);
-    if (anyPosted) db.data.stats.totalPosts += 1;
+    if (anyPosted) user.stats.totalPosts += 1;
   }
 
-  db.data.posts.unshift(post);
+  user.posts.unshift(post);
   await db.write();
 
   return { ok: true, post, log };

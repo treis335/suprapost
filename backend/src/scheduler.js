@@ -1,49 +1,74 @@
 const { runGenerationCycle } = require("./engine");
 
-let intervalHandle = null;
+// One timer per wallet address — each user's automation runs independently.
+// key: lowercase wallet address -> Node timeout handle
+const timers = new Map();
 
 /**
- * Starts the automation loop. Runs immediately, then every `cycleSeconds`.
- * Survives even if no frontend/browser is connected — this is the whole point:
- * the server is the source of truth, not the browser.
+ * Starts the automation loop for a specific user. Runs on their configured
+ * cycle, forever, until stopAutomation(db, address) is called. Survives
+ * even if no frontend/browser is connected for that user — this is the
+ * whole point: the server is the source of truth, not the browser.
  */
-function startAutomation(db) {
-  stopAutomation(); // clear any previous loop
+function startAutomation(db, address) {
+  stopAutomation(db, address, { persist: false }); // clear any previous loop for this user, but don't write yet
 
-  db.data.automation.running = true;
-  scheduleNext(db);
-  console.log(`[scheduler] Automation started — cycle every ${db.data.automation.cycleSeconds}s`);
+  const user = db.forUser(address);
+  user.automation.running = true;
+  scheduleNext(db, address);
+  console.log(`[scheduler] Automation started for ${address} — cycle every ${user.automation.cycleSeconds}s`);
 }
 
-function scheduleNext(db) {
-  const cycleMs = db.data.automation.cycleSeconds * 1000;
-  db.data.automation.nextRunAt = new Date(Date.now() + cycleMs).toISOString();
+function scheduleNext(db, address) {
+  const user = db.forUser(address);
+  const cycleMs = user.automation.cycleSeconds * 1000;
+  user.automation.nextRunAt = new Date(Date.now() + cycleMs).toISOString();
 
-  intervalHandle = setTimeout(async () => {
+  const handle = setTimeout(async () => {
     await db.read();
-    if (!db.data.automation.running) return;
+    const u = db.forUser(address);
+    if (!u.automation.running) return;
 
-    const { autoApprove } = db.data.automation;
-    await runGenerationCycle(db, { autoPost: autoApprove });
+    const { autoApprove } = u.automation;
+    await runGenerationCycle(db, address, { autoPost: autoApprove });
 
     await db.read(); // re-read in case settings changed mid-cycle
-    if (db.data.automation.running) {
-      scheduleNext(db);
+    if (db.forUser(address).automation.running) {
+      scheduleNext(db, address);
     }
   }, cycleMs);
+
+  timers.set(address.toLowerCase(), handle);
 }
 
-async function stopAutomation(db) {
-  if (intervalHandle) {
-    clearTimeout(intervalHandle);
-    intervalHandle = null;
+async function stopAutomation(db, address, { persist = true } = {}) {
+  const key = address.toLowerCase();
+  if (timers.has(key)) {
+    clearTimeout(timers.get(key));
+    timers.delete(key);
   }
-  if (db) {
-    db.data.automation.running = false;
-    db.data.automation.nextRunAt = null;
+  if (db && persist) {
+    const user = db.forUser(address);
+    user.automation.running = false;
+    user.automation.nextRunAt = null;
     await db.write();
   }
-  console.log("[scheduler] Automation stopped");
+  console.log(`[scheduler] Automation stopped for ${address}`);
 }
 
-module.exports = { startAutomation, stopAutomation };
+/**
+ * Called once at server boot: resumes automation for every user who had it
+ * running when the server last shut down, so a restart doesn't silently
+ * kill everyone's automation.
+ */
+function resumeAllAutomations(db) {
+  const users = db.data.users || {};
+  for (const [address, user] of Object.entries(users)) {
+    if (user.automation?.running) {
+      console.log(`[scheduler] Resuming automation for ${address}...`);
+      startAutomation(db, address);
+    }
+  }
+}
+
+module.exports = { startAutomation, stopAutomation, resumeAllAutomations };
