@@ -24,6 +24,16 @@ const TABS = [
 
 const fmt = (n) => Number(n ?? 0).toFixed(2);
 
+function fmtCountdown(ms) {
+  if (ms <= 0) return "Now";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60), sec = s % 60;
+  if (m < 60) return `${m}m ${sec}s`;
+  const h = Math.floor(m / 60), min = m % 60;
+  return `${h}h ${min}m`;
+}
+
 /* ============================================================
    API CLIENT — attaches the wallet session JWT to every request.
    A 401 means the session expired or was never valid; callers can
