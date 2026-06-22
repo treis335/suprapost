@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { C } from "./theme";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 
 /* ============================================================
