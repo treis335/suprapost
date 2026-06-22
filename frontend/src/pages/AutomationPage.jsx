@@ -67,6 +67,20 @@ export function AutomationPage({
             </div>
             <Switch checked={automation.autoApprove} onChange={(v) => saveAutomationSettings({ autoApprove: v })} />
           </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 15px", marginTop: 10 }}>
+            <div>
+              <div style={{ fontSize: "0.82rem", fontWeight: 600 }}>🖼 Generate image per post</div>
+              <div style={{ fontSize: "0.68rem", color: C.muted, marginTop: 3 }}>AI creates a visual for every automated post (needs TOGETHER_API_KEY)</div>
+            </div>
+            <Switch checked={!!automation.withImage} onChange={(v) => saveAutomationSettings({ withImage: v })} />
+          </div>
+          {automation.withImage && (
+            <div className="fade-up" style={{ marginTop: 10 }}>
+              <Select value={automation.imageStyle || "auto"} onChange={(e) => saveAutomationSettings({ imageStyle: e.target.value })} disabled={automation.running}>
+                {[["auto","Auto — AI decides"],["cyberpunk","Cyberpunk"],["photorealistic","Photorealistic"],["minimal","Minimalist"],["abstract","Abstract"],["infographic","Data / Infographic"],["retro","Retro Futurism"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+              </Select>
+            </div>
+          )}
         </Card>
 
         <Card eyebrow="How It Works" title="The Server Takes Over">

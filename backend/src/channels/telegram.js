@@ -1,10 +1,7 @@
 const axios = require("axios");
+const fs = require("fs");
+const FormData = require("form-data");
 
-/**
- * Telegram channel — Bot API.
- * Real, fully working publisher. Config can come from the dashboard
- * (db.data.channels.telegram) or fall back to .env on first run.
- */
 const id = "telegram";
 
 const meta = {
@@ -28,11 +25,11 @@ function escapeHtml(str = "") {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function send(rawText, cfg) {
+async function sendText(text, cfg) {
   try {
     const res = await axios.post(
       `https://api.telegram.org/bot${cfg.botToken}/sendMessage`,
-      { chat_id: cfg.chatId, text: rawText, parse_mode: "HTML" },
+      { chat_id: cfg.chatId, text, parse_mode: "HTML" },
       { timeout: 15000 }
     );
     return { ok: true, data: { messageId: res.data?.result?.message_id } };
@@ -41,14 +38,39 @@ async function send(rawText, cfg) {
   }
 }
 
-async function publish(text, cfg = {}) {
+async function sendPhoto(text, imagePath, cfg) {
+  try {
+    const form = new FormData();
+    form.append("chat_id", cfg.chatId);
+    form.append("caption", text);
+    form.append("parse_mode", "HTML");
+    form.append("photo", fs.createReadStream(imagePath), {
+      filename: "image.jpg",
+      contentType: "image/jpeg",
+    });
+
+    const res = await axios.post(
+      `https://api.telegram.org/bot${cfg.botToken}/sendPhoto`,
+      form,
+      { headers: form.getHeaders(), timeout: 30000 }
+    );
+    return { ok: true, data: { messageId: res.data?.result?.message_id } };
+  } catch (err) {
+    // graceful fallback to text-only if photo fails
+    console.warn("[telegram] sendPhoto failed, falling back to text:", err.response?.data?.description || err.message);
+    return sendText(text, cfg);
+  }
+}
+
+async function publish(text, cfg = {}, imagePath = null) {
   if (!isConfigured(cfg)) return { ok: false, simulated: true, reason: "not_configured" };
-  const formatted = `📢 <b>New SupraPost</b>\n\n${escapeHtml(text)}`;
-  return send(formatted, cfg);
+  const caption = `📢 <b>New SupraPost</b>\n\n${escapeHtml(text)}`;
+  if (imagePath && fs.existsSync(imagePath)) return sendPhoto(caption, imagePath, cfg);
+  return sendText(caption, cfg);
 }
 
 async function test(cfg = {}) {
-  return send("✅ <b>SupraPost</b> — this Telegram channel is connected.", cfg);
+  return sendText("✅ <b>SupraPost</b> — this Telegram channel is connected.", cfg);
 }
 
 module.exports = { id, meta, isConfigured, publish, test };

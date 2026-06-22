@@ -1,10 +1,7 @@
 const axios = require("axios");
+const fs = require("fs");
+const FormData = require("form-data");
 
-/**
- * Discord channel — incoming webhook.
- * Real, fully working publisher. No app review needed; the user just
- * pastes a webhook URL from a channel's Integrations settings.
- */
 const id = "discord";
 
 const meta = {
@@ -23,7 +20,7 @@ function isConfigured(cfg = {}) {
   return !!cfg.webhookUrl;
 }
 
-async function send(content, cfg) {
+async function sendText(content, cfg) {
   try {
     await axios.post(cfg.webhookUrl, { content }, { timeout: 15000 });
     return { ok: true };
@@ -32,13 +29,36 @@ async function send(content, cfg) {
   }
 }
 
-async function publish(text, cfg = {}) {
+async function sendWithImage(content, imagePath, cfg) {
+  try {
+    const form = new FormData();
+    // Discord webhook with file: payload_json + file attachment
+    form.append("payload_json", JSON.stringify({ content }));
+    form.append("file", fs.createReadStream(imagePath), {
+      filename: "image.jpg",
+      contentType: "image/jpeg",
+    });
+
+    await axios.post(cfg.webhookUrl, form, {
+      headers: form.getHeaders(),
+      timeout: 30000,
+    });
+    return { ok: true };
+  } catch (err) {
+    console.warn("[discord] sendWithImage failed, falling back to text:", err.response?.data?.message || err.message);
+    return sendText(content, cfg);
+  }
+}
+
+async function publish(text, cfg = {}, imagePath = null) {
   if (!isConfigured(cfg)) return { ok: false, simulated: true, reason: "not_configured" };
-  return send(`📢 **New SupraPost**\n\n${text}`, cfg);
+  const content = `📢 **New SupraPost**\n\n${text}`;
+  if (imagePath && fs.existsSync(imagePath)) return sendWithImage(content, imagePath, cfg);
+  return sendText(content, cfg);
 }
 
 async function test(cfg = {}) {
-  return send("✅ **SupraPost** — this Discord channel is connected.", cfg);
+  return sendText("✅ **SupraPost** — this Discord channel is connected.", cfg);
 }
 
 module.exports = { id, meta, isConfigured, publish, test };

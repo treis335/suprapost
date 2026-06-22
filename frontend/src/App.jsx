@@ -165,9 +165,9 @@ export default function App() {
   }
 
   /* ── Manual post ───────────────────────────────────────── */
-  async function onPost(text) {
+  async function onPost(text, imageFilename = null) {
     try {
-      const result = await api.post("/post", { text });
+      const result = await api.post("/post", { text, imageFilename });
       setPosts((p) => [result.post, ...p]);
       setStats((s) => ({ ...s, totalPosts: (s.totalPosts || 0) + 1 }));
       return result;

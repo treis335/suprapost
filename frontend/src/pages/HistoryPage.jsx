@@ -53,6 +53,11 @@ export function HistoryPage({ isMobile, posts, stats, clearHistory }) {
                   style={{ cursor: "pointer", padding: "15px 18px", display: "flex", alignItems: "flex-start", gap: 12 }}
                 >
                   <div style={{ flexShrink: 0, width: 8, height: 8, borderRadius: "50%", background: post.posted ? C.supra : C.muted, boxShadow: post.posted ? `0 0 6px ${C.supra}` : "none", marginTop: 5 }} />
+                  {post.imageUrl && (
+                    <div style={{ flexShrink: 0, width: 52, height: 52, borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}` }}>
+                      <img src={post.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    </div>
+                  )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "0.84rem", lineHeight: 1.55, color: C.text, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: open ? "unset" : 2, WebkitBoxOrient: "vertical", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                       {post.text}

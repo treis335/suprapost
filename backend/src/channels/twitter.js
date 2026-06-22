@@ -1,8 +1,5 @@
-/**
- * Twitter / X channel — API v2 (user-context, OAuth 1.0a keys).
- * Real, fully working publisher once the user supplies a key pair
- * with write access from the X Developer Portal.
- */
+const fs = require("fs");
+
 const id = "twitter";
 
 const meta = {
@@ -10,7 +7,7 @@ const meta = {
   name: "Twitter / X",
   icon: "𝕏",
   color: "#1d9bf0",
-  description: "Post a tweet (auto-trimmed to 280 characters).",
+  description: "Post a tweet with optional image (auto-trimmed to 280 chars).",
   fields: [
     { key: "apiKey", label: "API Key", type: "password" },
     { key: "apiSecret", label: "API Secret", type: "password" },
@@ -34,23 +31,41 @@ function client(cfg) {
   });
 }
 
-async function tweet(text, cfg) {
+async function publish(text, cfg = {}, imagePath = null) {
+  if (!isConfigured(cfg)) return { ok: false, simulated: true, reason: "not_configured" };
+
   try {
     const body = text.length > 280 ? text.slice(0, 277) + "..." : text;
-    const res = await client(cfg).v2.tweet(body);
-    return { ok: true, data: { id: res.data.id }, url: `https://x.com/i/web/status/${res.data.id}` };
+    const twClient = client(cfg);
+
+    let mediaIds = undefined;
+
+    if (imagePath && fs.existsSync(imagePath)) {
+      try {
+        // Twitter v1.1 media upload, then attach to v2 tweet
+        const mediaId = await twClient.v1.uploadMedia(imagePath);
+        mediaIds = [mediaId];
+      } catch (mediaErr) {
+        console.warn("[twitter] media upload failed, posting text only:", mediaErr.message);
+      }
+    }
+
+    const payload = { text: body };
+    if (mediaIds) payload.media = { media_ids: mediaIds };
+
+    const res = await twClient.v2.tweet(payload);
+    return {
+      ok: true,
+      data: { id: res.data.id },
+      url: `https://x.com/i/web/status/${res.data.id}`,
+    };
   } catch (err) {
     return { ok: false, error: err.data?.detail || err.message };
   }
 }
 
-async function publish(text, cfg = {}) {
-  if (!isConfigured(cfg)) return { ok: false, simulated: true, reason: "not_configured" };
-  return tweet(text, cfg);
-}
-
 async function test(cfg = {}) {
-  return tweet("✅ SupraPost — this X account is connected.", cfg);
+  return publish("✅ SupraPost — this X account is connected.", cfg);
 }
 
 module.exports = { id, meta, isConfigured, publish, test };

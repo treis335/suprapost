@@ -23,8 +23,8 @@ function scheduleNext(db) {
     await db.read();
     if (!db.data.automation.running) return;
 
-    const { autoApprove } = db.data.automation;
-    await runGenerationCycle(db, { autoPost: autoApprove });
+    const { autoApprove, withImage, imageStyle } = db.data.automation;
+    await runGenerationCycle(db, { autoPost: autoApprove, withImage: !!withImage, imageStyle: imageStyle || "auto" });
 
     await db.read(); // re-read in case settings changed mid-cycle
     if (db.data.automation.running) {

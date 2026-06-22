@@ -7,11 +7,11 @@ const { initDB } = require("./db");
 const { runGenerationCycle } = require("./engine");
 const { startAutomation, stopAutomation } = require("./scheduler");
 const channels = require("./channels");
+const { generateImage, saveUploadedImage, cleanOldImages, STYLES, IMAGES_DIR } = require("./imageGen");
 
 const PORT = process.env.PORT || 3001;
 const FRONTEND_DIST = path.join(__dirname, "..", "..", "frontend", "dist");
 
-/** Masks secret fields so tokens never round-trip to the browser in plaintext. */
 function maskChannelValues(fields, cfg = {}) {
   const out = {};
   for (const f of fields) {
@@ -39,25 +39,27 @@ function serializeChannel(channel, cfg) {
 
 async function main() {
   const db = await initDB();
+
+  // Clean up images older than 7 days on startup
+  cleanOldImages(7);
+
   const app = express();
-
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: "20mb" })); // generous limit for base64 image uploads
 
-  // ── Resume automation on server restart if it was running ──
+  // Serve generated/uploaded images so Discord embeds and previews work
+  app.use("/images", express.static(IMAGES_DIR));
+
   if (db.data.automation.running) {
-    console.log("[server] Resuming automation that was left running...");
+    console.log("[server] Resuming automation...");
     startAutomation(db);
   }
 
-  // ════════════════════════════════════════════════════════
-  // SETTINGS — content profile (niche, tone, audience, etc.)
-  // ════════════════════════════════════════════════════════
+  // ── Settings ──────────────────────────────────────────────────────────────
   app.get("/api/settings", async (req, res) => {
     await db.read();
     res.json(db.data.settings);
   });
-
   app.post("/api/settings", async (req, res) => {
     await db.read();
     db.data.settings = { ...db.data.settings, ...req.body };
@@ -65,60 +67,68 @@ async function main() {
     res.json(db.data.settings);
   });
 
-  // ════════════════════════════════════════════════════════
-  // CHANNELS — per-network config (Telegram, Discord, X, Instagram, ...)
-  // Scales to new social networks without touching this file: add a
-  // module under backend/src/channels/ and register it in the index.
-  // ════════════════════════════════════════════════════════
+  // ── Channels ──────────────────────────────────────────────────────────────
   app.get("/api/channels", async (req, res) => {
     await db.read();
-    const list = channels.list().map((channel) => serializeChannel(channel, db.data.channels[channel.id] || {}));
+    const list = channels.list().map((ch) => serializeChannel(ch, db.data.channels[ch.id] || {}));
     res.json(list);
   });
-
   app.post("/api/channels/:id", async (req, res) => {
     await db.read();
     const channel = channels.get(req.params.id);
     if (!channel) return res.status(404).json({ ok: false, error: "Unknown channel" });
-
     const cfg = db.data.channels[req.params.id] || {};
-    const body = req.body || {};
-
     for (const f of channel.meta.fields) {
-      const incoming = body[f.key];
-      // ignore masked placeholders ("••••") coming back unedited from the UI
-      if (typeof incoming === "string" && incoming.length && !incoming.includes("•")) {
-        cfg[f.key] = incoming;
-      }
+      const v = req.body[f.key];
+      if (typeof v === "string" && v.length && !v.includes("•")) cfg[f.key] = v;
     }
-    if (typeof body.enabled === "boolean") cfg.enabled = body.enabled;
-
+    if (typeof req.body.enabled === "boolean") cfg.enabled = req.body.enabled;
     db.data.channels[req.params.id] = cfg;
     await db.write();
     res.json(serializeChannel(channel, cfg));
   });
-
   app.post("/api/channels/:id/test", async (req, res) => {
     await db.read();
     const channel = channels.get(req.params.id);
     if (!channel) return res.status(404).json({ ok: false, error: "Unknown channel" });
-
     const cfg = db.data.channels[req.params.id] || {};
-    if (!channel.isConfigured(cfg)) {
-      return res.json({ ok: false, simulated: true, reason: "not_configured" });
-    }
-    const result = await channel.test(cfg);
+    if (!channel.isConfigured(cfg)) return res.json({ ok: false, simulated: true, reason: "not_configured" });
+    res.json(await channel.test(cfg));
+  });
+
+  // ── Image generation ──────────────────────────────────────────────────────
+  // List available styles
+  app.get("/api/image/styles", (req, res) => {
+    res.json(Object.entries(STYLES).map(([id, s]) => ({ id, label: s.label })));
+  });
+
+  // Generate an image from post text (AI)
+  app.post("/api/image/generate", async (req, res) => {
+    const { postText, style, customPrompt, width, height } = req.body;
+    if (!postText) return res.status(400).json({ ok: false, error: "postText required" });
+    const result = await generateImage({ postText, style, customPrompt, width, height });
+    if (result.ok) result.imageUrl = `/images/${result.imageFilename}`;
     res.json(result);
   });
 
-  // ════════════════════════════════════════════════════════
-  // WALLET — balance, top-up (simulated SUPRA for now)
-  // ════════════════════════════════════════════════════════
+  // Accept a user-uploaded image (base64)
+  app.post("/api/image/upload", (req, res) => {
+    const { data, mimeType } = req.body;
+    if (!data) return res.status(400).json({ ok: false, error: "data required" });
+    try {
+      const result = saveUploadedImage(data, mimeType);
+      result.imageUrl = `/images/${result.imageFilename}`;
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // ── Wallet ────────────────────────────────────────────────────────────────
   app.get("/api/wallet", async (req, res) => {
     await db.read();
     res.json(db.data.wallet);
   });
-
   app.post("/api/wallet/topup", async (req, res) => {
     await db.read();
     const amount = Number(req.body.amount) || 10;
@@ -127,13 +137,19 @@ async function main() {
     res.json(db.data.wallet);
   });
 
-  // ════════════════════════════════════════════════════════
-  // GENERATE — manual single generation (from "Generate" tab)
-  // ════════════════════════════════════════════════════════
+  // ── Generate ──────────────────────────────────────────────────────────────
   app.post("/api/generate", async (req, res) => {
     try {
-      const autoPost = !!req.body.autoPost; // false = just preview, true = post immediately
-      const result = await runGenerationCycle(db, { autoPost });
+      const { autoPost, withImage, imageStyle, imageCustomPrompt } = req.body;
+      const result = await runGenerationCycle(db, {
+        autoPost: !!autoPost,
+        withImage: !!withImage,
+        imageStyle: imageStyle || "auto",
+        imageCustomPrompt: imageCustomPrompt || "",
+      });
+      if (result.ok && result.post?.imageFilename) {
+        result.post.imageUrl = `/images/${result.post.imageFilename}`;
+      }
       res.json(result);
     } catch (err) {
       console.error(err);
@@ -141,12 +157,13 @@ async function main() {
     }
   });
 
-  // Post an already-generated (or edited) draft on demand, to every
-  // enabled channel (or a specific subset via { channels: ["telegram"] })
+  // Manual post (with optional pre-generated image)
   app.post("/api/post", async (req, res) => {
     await db.read();
-    const { text, channels: only } = req.body;
+    const { text, imageFilename, channels: only } = req.body;
     if (!text) return res.status(400).json({ ok: false, error: "Missing text" });
+
+    const imagePath = imageFilename ? path.join(IMAGES_DIR, imageFilename) : null;
 
     const targetConfig = { ...db.data.channels };
     if (Array.isArray(only) && only.length) {
@@ -155,7 +172,7 @@ async function main() {
       }
     }
 
-    const channelResults = await channels.publishToChannels(text, targetConfig);
+    const channelResults = await channels.publishToChannels(text, targetConfig, imagePath);
     const posted = Object.values(channelResults).some((r) => r.ok);
 
     const post = {
@@ -164,6 +181,8 @@ async function main() {
       time: new Date().toISOString(),
       auto: false,
       posted,
+      imageFilename: imageFilename || null,
+      imageUrl: imageFilename ? `/images/${imageFilename}` : null,
       channelResults,
     };
     db.data.posts.unshift(post);
@@ -173,76 +192,63 @@ async function main() {
     res.json({ ok: true, post });
   });
 
-  // ════════════════════════════════════════════════════════
-  // AUTOMATION — start/stop cron-driven cycle, settings
-  // ════════════════════════════════════════════════════════
+  // ── Automation ────────────────────────────────────────────────────────────
   app.get("/api/automation", async (req, res) => {
     await db.read();
     res.json(db.data.automation);
   });
-
   app.post("/api/automation/settings", async (req, res) => {
     await db.read();
-    const { cycleSeconds, autoApprove } = req.body;
+    const { cycleSeconds, autoApprove, withImage, imageStyle } = req.body;
     if (cycleSeconds) db.data.automation.cycleSeconds = Number(cycleSeconds);
     if (typeof autoApprove === "boolean") db.data.automation.autoApprove = autoApprove;
+    if (typeof withImage === "boolean") db.data.automation.withImage = withImage;
+    if (imageStyle) db.data.automation.imageStyle = imageStyle;
     await db.write();
     res.json(db.data.automation);
   });
-
   app.post("/api/automation/start", async (req, res) => {
     await db.read();
     startAutomation(db);
     await db.write();
     res.json(db.data.automation);
   });
-
   app.post("/api/automation/stop", async (req, res) => {
     await stopAutomation(db);
     res.json(db.data.automation);
   });
 
-  // ════════════════════════════════════════════════════════
-  // HISTORY & STATS
-  // ════════════════════════════════════════════════════════
+  // ── History + Stats ───────────────────────────────────────────────────────
   app.get("/api/posts", async (req, res) => {
     await db.read();
-    res.json(db.data.posts);
+    // Attach imageUrl if file still exists
+    const posts = db.data.posts.map((p) => ({
+      ...p,
+      imageUrl: p.imageFilename ? `/images/${p.imageFilename}` : null,
+    }));
+    res.json(posts);
   });
-
   app.delete("/api/posts", async (req, res) => {
     await db.read();
     db.data.posts = [];
     await db.write();
     res.json({ ok: true });
   });
-
   app.get("/api/stats", async (req, res) => {
     await db.read();
     res.json(db.data.stats);
   });
 
-  // ════════════════════════════════════════════════════════
-  // HEALTH CHECK
-  // ════════════════════════════════════════════════════════
+  // ── Health ────────────────────────────────────────────────────────────────
   app.get("/api/health", (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
-  // ════════════════════════════════════════════════════════
-  // SERVE FRONTEND (built React app) — same origin, no CORS needed
-  // ════════════════════════════════════════════════════════
+  // ── Frontend SPA ──────────────────────────────────────────────────────────
   if (fs.existsSync(FRONTEND_DIST)) {
     app.use(express.static(FRONTEND_DIST));
-    // SPA fallback: any non-/api route returns index.html
-    app.get(/^(?!\/api).*/, (req, res) => {
-      res.sendFile(path.join(FRONTEND_DIST, "index.html"));
-    });
+    app.get(/^(?!\/api|\/images).*/, (req, res) => res.sendFile(path.join(FRONTEND_DIST, "index.html")));
     console.log(`[server] Serving built frontend from ${FRONTEND_DIST}`);
   } else {
-    app.get("/", (req, res) => {
-      res.send(
-        "<h2>SupraPost backend is running.</h2><p>Frontend not built yet — run <code>npm run build</code> in /frontend, or run the frontend dev server separately on its own port (e.g. http://localhost:5173).</p>"
-      );
-    });
+    app.get("/", (req, res) => res.send("<h2>SupraPost backend running.</h2><p>Build the frontend first.</p>"));
   }
 
   app.listen(PORT, () => {
@@ -251,7 +257,4 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error("Fatal error starting server:", err);
-  process.exit(1);
-});
+main().catch((err) => { console.error("Fatal:", err); process.exit(1); });
