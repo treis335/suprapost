@@ -802,7 +802,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
             <div style={{ fontSize: "0.7rem", color: C.muted, marginBottom: 4 }}>Signed in with</div>
-            <div style={{ fontFamily: C.mono, fontSize: "0.86rem", color: C.text }}>{session.address}</div>
+            <div style={{ fontFamily: C.mono, fontSize: "0.86rem", color: C.text }}>{session?.address}</div>
           </div>
           <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
         </div>
@@ -1194,7 +1194,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.85)", backdropFilter: "blur(10px)", position: "sticky", top: 0, zIndex: 100 }}>
           <div style={{ fontWeight: 700, fontSize: "1.1rem", fontFamily: C.display }}>Supra<span style={{ color: C.accent }}>Post</span></div>
           <div style={{ display: "flex", gap: 7 }}>
-            <Pill color={C.accent2}>{shortAddress(session.address)}</Pill>
+            <Pill color={C.accent2}>{shortAddress(session?.address)}</Pill>
             <Pill color={C.supra}>⬡ {fmt(wallet.balance)}</Pill>
             <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "ON" : "OFF"}</Pill>
           </div>
@@ -1270,7 +1270,7 @@ export default function App() {
           <ConnStatus ok={backendOk} />
           <Pill color={C.supra}>⬡ {fmt(wallet.balance)} SUPRA</Pill>
           <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Automation active" : "Idle"}</Pill>
-          <Pill color={C.accent2}>{shortAddress(session.address)}</Pill>
+          <Pill color={C.accent2}>{shortAddress(session?.address)}</Pill>
           <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
         </div>
       </div>
