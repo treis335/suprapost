@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "./theme";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
+import { ComposePage } from "./pages/ComposePage";
 
 /* ============================================================
    DESIGN SYSTEM — "Pulse" v2
