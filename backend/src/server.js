@@ -91,9 +91,9 @@ async function main() {
   });
 
   app.post("/api/auth/verify", async (req, res) => {
-    const { address, signature } = req.body;
+    const { address, signature, publicKey } = req.body;
     if (!address || !signature) return res.status(400).json({ ok: false, error: "Missing address or signature" });
-    const result = await verifyAndIssueToken(address, signature);
+    const result = await verifyAndIssueToken(address, signature, publicKey);
     if (!result.ok) return res.status(401).json(result);
     res.json(result);
   });
