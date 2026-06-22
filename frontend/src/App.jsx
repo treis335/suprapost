@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 
 /* ============================================================
@@ -666,7 +666,9 @@ export default function App() {
         api.get("/settings"), api.get("/wallet"), api.get("/automation"), api.get("/posts"), api.get("/stats"), api.get("/channels"),
       ]);
       if (s.unauthorized) { handleSignOut(); return; }
-      setSettings(s); setWallet(w); setAutomation(a); setPosts(p); setStats(st); setChannels(ch);
+      // channels API returns an object {id: {...}} — normalise to array for ComposePage
+      const channelsArr = Array.isArray(ch) ? ch : Object.values(ch || {});
+      setSettings(s); setWallet(w); setAutomation(a); setPosts(p); setStats(st); setChannels(channelsArr);
       setBackendOk(true);
     } catch {
       setBackendOk(false);
@@ -702,7 +704,7 @@ export default function App() {
   function updateSetting(key, value) { setSettings((s) => ({ ...s, [key]: value })); }
   async function saveSettings() { const updated = await api.post("/settings", settings); setSettings(updated); }
   async function topUp(amount = 10) { const w = await api.post("/wallet/topup", { amount }); setWallet(w); }
-  async function toggleChannel(id, enabled) { const updated = await api.post(`/channels/${id}`, { enabled }); setChannels(updated); }
+  async function toggleChannel(id, enabled) { const updated = await api.post(`/channels/${id}`, { enabled }); setChannels(Array.isArray(updated) ? updated : Object.values(updated || {})); }
   async function saveChannelCredentials(id, credentials) {
     // saving credentials also auto-enables the channel, so the user doesn't
     // have to save then separately flip the toggle
@@ -727,14 +729,14 @@ export default function App() {
   }
 
   /* ── Generate ──────────────────────────────────────────── */
-  async function handleGenerate() {
+  async function handleGenerate(opts = {}) {
     setGenerating(true);
     setGenLog([]);
     setTweet("");
     setScores([]);
     setEditing(false);
     try {
-      const data = await api.post("/generate", { autoPost: false });
+      const data = await api.post("/generate", { autoPost: false, mode: "text", ...opts });
       if (data.ok && data.post) {
         setTweet(data.post.text);
         setEditText(data.post.text);
@@ -889,7 +891,154 @@ export default function App() {
     />
   );
 
-    /* ============================================================
+  /* ============================================================
+     PANEL: CHANNELS
+  ============================================================ */
+  const CHANNEL_INFO = {
+    telegram:  { name: "Telegram",    icon: "✈",  color: "#34b7eb", fields: [
+      { key: "botToken", label: "Bot Token", placeholder: "123456:ABC-DEF..." },
+      { key: "chatId",   label: "Chat ID",   placeholder: "-100123456789" },
+    ], helpUrl: "https://core.telegram.org/bots#how-do-i-create-a-bot" },
+    discord:   { name: "Discord",     icon: "🎮", color: "#5865F2", fields: [
+      { key: "webhookUrl", label: "Webhook URL", placeholder: "https://discord.com/api/webhooks/..." },
+    ], helpUrl: "https://support.discord.com/hc/en-us/articles/228383668" },
+    twitter:   { name: "Twitter / X", icon: "𝕏",  color: "#1d9bf0", fields: [
+      { key: "apiKey",       label: "API Key",             placeholder: "" },
+      { key: "apiSecret",    label: "API Secret",          placeholder: "" },
+      { key: "accessToken",  label: "Access Token",        placeholder: "" },
+      { key: "accessSecret", label: "Access Token Secret", placeholder: "" },
+    ], helpUrl: "https://developer.twitter.com/en/portal/dashboard" },
+    instagram: { name: "Instagram",   icon: "📷", color: "#E1306C", fields: [
+      { key: "accessToken",  label: "Access Token",   placeholder: "" },
+      { key: "igUserId",     label: "Account ID",     placeholder: "" },
+      { key: "imageBaseUrl", label: "Public Base URL (for images)", placeholder: "https://yourdomain.com" },
+    ], helpUrl: "https://developers.facebook.com/docs/instagram-platform" },
+  };
+
+  const ChannelsPanel = () => {
+    const [expanding, setExpanding] = React.useState(null);
+    const [creds, setCreds] = React.useState({});
+    const [testResults, setTestResults] = React.useState({});
+
+    const channelIds = Object.keys(CHANNEL_INFO);
+
+    async function saveChannel(id) {
+      const info = CHANNEL_INFO[id];
+      const credentials = {};
+      for (const f of info.fields) credentials[f.key] = creds[id]?.[f.key] || "";
+      const updated = await api.post(`/channels/${id}`, { credentials });
+      const arr = Array.isArray(updated) ? updated : Object.values(updated || {});
+      setChannels(arr);
+    }
+
+    async function testChannel(id) {
+      const result = await api.post(`/channels/${id}/test`);
+      setTestResults((prev) => ({ ...prev, [id]: result }));
+    }
+
+    const ch = (id) => channels.find((c) => c.id === id) || {};
+
+    return (
+      <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {!isMobile && (
+          <div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Channels</div>
+            <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 4 }}>Connect your social networks — credentials stay on the server, never in the browser.</div>
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: isCompact ? "1fr" : "repeat(2,1fr)", gap: 14 }}>
+          {channelIds.map((id) => {
+            const info = CHANNEL_INFO[id];
+            const state = ch(id);
+            const open = expanding === id;
+            const configured = state.configured;
+            const enabled = state.enabled;
+
+            return (
+              <Card key={id} accentTop={configured && enabled ? info.color : undefined}
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Header row */}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 9, background: `${info.color}1f`,
+                      border: `1px solid ${info.color}44`, display: "flex", alignItems: "center",
+                      justifyContent: "center", fontSize: "1.1rem", flexShrink: 0 }}>{info.icon}</div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: "0.94rem" }}>{info.name}</div>
+                      <div style={{ fontSize: "0.68rem", color: configured && enabled ? C.supra : configured ? C.warn : C.muted, marginTop: 2 }}>
+                        {configured && enabled ? "● Active" : configured ? "● Configured · paused" : "○ Not configured"}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: "0.74rem", color: C.muted }}>{enabled ? "On" : "Off"}</span>
+                    <button onClick={() => toggleChannel(id, !enabled)} style={{
+                      width: 42, height: 24, borderRadius: 20, border: `1px solid ${enabled ? info.color : C.border}`,
+                      background: enabled ? info.color : C.raised, position: "relative", cursor: "pointer", padding: 0, transition: "all 0.25s",
+                    }}>
+                      <span style={{ position: "absolute", top: 2, left: enabled ? 20 : 2, width: 18, height: 18,
+                        borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Expand/collapse credentials */}
+                <button onClick={() => setExpanding(open ? null : id)}
+                  style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8,
+                    color: C.text2, cursor: "pointer", padding: "8px 12px", fontSize: "0.76rem",
+                    display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>{configured ? "Update credentials" : "Enter credentials"}</span>
+                  <span style={{ color: C.muted }}>{open ? "▲" : "▼"}</span>
+                </button>
+
+                {open && (
+                  <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {info.fields.map((f) => (
+                      <Field key={f.key} label={f.label}>
+                        <Input
+                          type="password"
+                          placeholder={f.placeholder || ""}
+                          value={creds[id]?.[f.key] || ""}
+                          onChange={(e) => setCreds((prev) => ({ ...prev, [id]: { ...prev[id], [f.key]: e.target.value } }))}
+                        />
+                      </Field>
+                    ))}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <Btn variant="primary" size="sm" onClick={() => saveChannel(id)}>Save</Btn>
+                      <Btn variant="ghost"   size="sm" onClick={() => testChannel(id)}>Test connection</Btn>
+                      {info.helpUrl && (
+                        <a href={info.helpUrl} target="_blank" rel="noreferrer"
+                          style={{ fontSize: "0.7rem", color: C.muted, marginLeft: "auto", alignSelf: "center" }}>
+                          How to get credentials ↗
+                        </a>
+                      )}
+                    </div>
+                    {testResults[id] && (
+                      <div className="pop-in" style={{ fontSize: "0.74rem", padding: "8px 12px", borderRadius: 8,
+                        background: testResults[id].ok ? `${C.supra}14` : `${C.danger}14`,
+                        border: `1px solid ${testResults[id].ok ? C.supra : C.danger}40`,
+                        color: testResults[id].ok ? C.supra : C.danger }}>
+                        {testResults[id].ok ? "✓ Test message sent successfully." : `✕ ${testResults[id].error || testResults[id].reason || "Failed"}`}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+
+        <Card eyebrow="Note" style={{ background: "transparent", border: `1px dashed ${C.border}` }}>
+          <div style={{ fontSize: "0.78rem", color: C.text2, lineHeight: 1.65 }}>
+            Credentials are stored server-side in <code style={{ background: C.bg, padding: "2px 6px", borderRadius: 5, fontFamily: C.mono, fontSize: "0.74rem" }}>backend/data/db.json</code> — never sent back to the browser. When toggling channels on/off, the credentials remain intact.
+          </div>
+        </Card>
+      </div>
+    );
+  };
+  const Channels = <ChannelsPanel />;
+
+  /* ============================================================
      PANEL: AUTOMATION
   ============================================================ */
   const Automation = (
@@ -945,6 +1094,28 @@ export default function App() {
             </div>
             <input type="checkbox" checked={automation.autoApprove} onChange={(e) => saveAutomationSettings({ autoApprove: e.target.checked })} style={{ width: 22, height: 22, accentColor: C.accent, cursor: "pointer" }} />
           </div>
+
+          <Field label="Content mode" hint="What each automated cycle will post">
+            <Select value={automation.mode || "text"} onChange={(e) => saveAutomationSettings({ mode: e.target.value })} disabled={automation.running}>
+              <option value="text">📝 Text Only (AI generated)</option>
+              <option value="image">🖼 Image Only (AI generated)</option>
+              <option value="both">✦ Text + Image (both AI generated)</option>
+            </Select>
+          </Field>
+
+          {(automation.mode === "image" || automation.mode === "both") && (
+            <Field label="Image style">
+              <Select value={automation.imageStyle || "auto"} onChange={(e) => saveAutomationSettings({ imageStyle: e.target.value })} disabled={automation.running}>
+                <option value="auto">Auto — AI decides</option>
+                <option value="cyberpunk">Cyberpunk</option>
+                <option value="photorealistic">Photorealistic</option>
+                <option value="minimal">Minimalist</option>
+                <option value="abstract">Abstract</option>
+                <option value="infographic">Data / Infographic</option>
+                <option value="retro">Retro Futurism</option>
+              </Select>
+            </Field>
+          )}
         </Card>
 
         <Card eyebrow="How It Works" title="The Server Takes Over">
@@ -1003,7 +1174,7 @@ export default function App() {
     </div>
   );
 
-  const panels = { setup: Setup, compose: Generate, automation: Automation, history: History };
+  const panels = { setup: Setup, channels: Channels, compose: Generate, automation: Automation, history: History };
 
   /* ============================================================
      AUTH GATE — show the wallet sign-in screen until we have a session

@@ -1,22 +1,14 @@
 const { runGenerationCycle } = require("./engine");
 
 // One timer per wallet address — each user's automation runs independently.
-// key: lowercase wallet address -> Node timeout handle
 const timers = new Map();
 
-/**
- * Starts the automation loop for a specific user. Runs on their configured
- * cycle, forever, until stopAutomation(db, address) is called. Survives
- * even if no frontend/browser is connected for that user — this is the
- * whole point: the server is the source of truth, not the browser.
- */
 function startAutomation(db, address) {
-  stopAutomation(db, address, { persist: false }); // clear any previous loop for this user, but don't write yet
-
+  stopAutomation(db, address, { persist: false });
   const user = db.forUser(address);
   user.automation.running = true;
   scheduleNext(db, address);
-  console.log(`[scheduler] Automation started for ${address} — cycle every ${user.automation.cycleSeconds}s`);
+  console.log(`[scheduler] Started for ${address} — cycle every ${user.automation.cycleSeconds}s`);
 }
 
 function scheduleNext(db, address) {
@@ -29,13 +21,16 @@ function scheduleNext(db, address) {
     const u = db.forUser(address);
     if (!u.automation.running) return;
 
-    const { autoApprove } = u.automation;
-    await runGenerationCycle(db, address, { autoPost: autoApprove, mode: auto.mode || 'text', imageStyle: auto.imageStyle || 'auto', imageCustomPrompt: auto.imageCustomPrompt || '' });
+    const { autoApprove, mode, imageStyle, imageCustomPrompt } = u.automation;
+    await runGenerationCycle(db, address, {
+      autoPost: autoApprove,
+      mode:              mode              || "text",
+      imageStyle:        imageStyle        || "auto",
+      imageCustomPrompt: imageCustomPrompt || "",
+    });
 
-    await db.read(); // re-read in case settings changed mid-cycle
-    if (db.forUser(address).automation.running) {
-      scheduleNext(db, address);
-    }
+    await db.read();
+    if (db.forUser(address).automation.running) scheduleNext(db, address);
   }, cycleMs);
 
   timers.set(address.toLowerCase(), handle);
@@ -43,29 +38,20 @@ function scheduleNext(db, address) {
 
 async function stopAutomation(db, address, { persist = true } = {}) {
   const key = address.toLowerCase();
-  if (timers.has(key)) {
-    clearTimeout(timers.get(key));
-    timers.delete(key);
-  }
+  if (timers.has(key)) { clearTimeout(timers.get(key)); timers.delete(key); }
   if (db && persist) {
     const user = db.forUser(address);
     user.automation.running = false;
     user.automation.nextRunAt = null;
     await db.write();
   }
-  console.log(`[scheduler] Automation stopped for ${address}`);
+  console.log(`[scheduler] Stopped for ${address}`);
 }
 
-/**
- * Called once at server boot: resumes automation for every user who had it
- * running when the server last shut down, so a restart doesn't silently
- * kill everyone's automation.
- */
 function resumeAllAutomations(db) {
-  const users = db.data.users || {};
-  for (const [address, user] of Object.entries(users)) {
+  for (const [address, user] of Object.entries(db.data.users || {})) {
     if (user.automation?.running) {
-      console.log(`[scheduler] Resuming automation for ${address}...`);
+      console.log(`[scheduler] Resuming ${address}...`);
       startAutomation(db, address);
     }
   }

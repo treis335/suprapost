@@ -18,11 +18,29 @@ const FRONTEND_DIST = path.join(__dirname, "..", "..", "frontend", "dist");
  * Strips credential secrets before sending channel state to the frontend.
  * The UI only needs to know a channel IS configured, not see the token.
  */
+const CHANNEL_META = {
+  telegram:  { name: "Telegram",    icon: "✈",  color: "#34b7eb" },
+  discord:   { name: "Discord",     icon: "🎮", color: "#5865F2" },
+  twitter:   { name: "Twitter / X", icon: "𝕏",  color: "#1d9bf0" },
+  instagram: { name: "Instagram",   icon: "📷", color: "#E1306C" },
+};
+
 function maskChannels(channels) {
   const out = {};
   for (const [id, ch] of Object.entries(channels)) {
     const hasCreds = ch.credentials && Object.values(ch.credentials).some(Boolean);
-    out[id] = { label: ch.label, icon: ch.icon, connected: ch.connected || hasCreds, enabled: ch.enabled };
+    const meta = CHANNEL_META[id] || { name: id, icon: "●", color: "#5f5783" };
+    out[id] = {
+      id,
+      name:       meta.name,
+      icon:       meta.icon,
+      color:      meta.color,
+      label:      ch.label || meta.name,
+      enabled:    !!ch.enabled,
+      configured: !!(ch.connected || hasCreds),
+      connected:  !!(ch.connected || hasCreds),
+      comingSoon: false,
+    };
   }
   return out;
 }
@@ -276,9 +294,17 @@ async function main() {
   app.post("/api/automation/settings", requireAuth, async (req, res) => {
     await db.read();
     const user = db.forUser(req.walletAddress);
-    const { cycleSeconds, autoApprove } = req.body;
-    if (cycleSeconds) user.automation.cycleSeconds = Number(cycleSeconds);
-    if (typeof autoApprove === "boolean") user.automation.autoApprove = autoApprove;
+    const { cycleSeconds, autoApprove, mode, imageStyle, imageCustomPrompt, withImage } = req.body;
+    if (cycleSeconds)                     user.automation.cycleSeconds      = Number(cycleSeconds);
+    if (typeof autoApprove === "boolean") user.automation.autoApprove       = autoApprove;
+    if (mode)                             user.automation.mode              = mode;
+    if (imageStyle)                       user.automation.imageStyle        = imageStyle;
+    if (imageCustomPrompt !== undefined)  user.automation.imageCustomPrompt = imageCustomPrompt;
+    if (typeof withImage === "boolean") {
+      user.automation.mode = withImage
+        ? (user.automation.mode !== "image" ? "both" : "image")
+        : (user.automation.mode === "both"  ? "text" : user.automation.mode);
+    }
     await db.write();
     res.json(user.automation);
   });
