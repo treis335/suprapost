@@ -9,13 +9,14 @@
     "dev": "node --watch src/server.js"
   },
   "dependencies": {
-    "@noble/ed25519": "^3.1.0",
+    "@noble/ed25519": "1.7.3",
     "axios": "^1.7.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^3.0.3",
+    "suprapost": "file:..",
     "uuid": "^9.0.1"
   }
 }
