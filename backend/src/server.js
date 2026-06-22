@@ -125,20 +125,50 @@ async function main() {
   // ════════════════════════════════════════════════════════
   // WALLET — balance, top-up
   // ════════════════════════════════════════════════════════
+
+  // GET /api/wallet
+  // - ALLOW_SIMULATED_TOPUP=true  → return stored (simulated) balance
+  // - otherwise                   → fetch real on-chain balance, store it, return it
   app.get("/api/wallet", requireAuth, async (req, res) => {
     await db.read();
-    res.json(db.forUser(req.walletAddress).wallet);
+    const user = db.forUser(req.walletAddress);
+
+    if (process.env.ALLOW_SIMULATED_TOPUP !== "true") {
+      // Real mode: read balance directly from the Supra blockchain
+      try {
+        const { getBalance } = require("./supraClient");
+        const onChain = await getBalance(req.walletAddress);
+        // truncate to 10 decimal places — chain returns up to 8 (octa precision)
+        user.wallet.balance = +onChain.toFixed(8);
+        await db.write();
+      } catch (err) {
+        console.error("[wallet] Failed to fetch on-chain balance:", err.message);
+        // fall through — return last-known cached balance rather than erroring
+      }
+    }
+
+    res.json(user.wallet);
   });
 
-  // DEV-ONLY simulated top-up — adds balance with no real transaction.
-  // Keep this disabled (or remove the route) before going live with real
-  // users, otherwise anyone could give themselves free SUPRA balance.
+  // POST /api/wallet/topup — DEV ONLY (ALLOW_SIMULATED_TOPUP=true)
+  // Adds balance without a real transaction. Never expose in production.
   if (process.env.ALLOW_SIMULATED_TOPUP === "true") {
     app.post("/api/wallet/topup", requireAuth, async (req, res) => {
       await db.read();
       const user = db.forUser(req.walletAddress);
-      const amount = Number(req.body.amount) || 10;
-      user.wallet.balance = +(user.wallet.balance + amount).toFixed(2);
+
+      // Validate: must be a positive number with at most 10 decimal places
+      const raw = String(req.body.amount ?? "");
+      const decimals = raw.includes(".") ? raw.split(".")[1].length : 0;
+      if (decimals > 8) {
+        return res.status(400).json({ ok: false, error: "Amount cannot have more than 8 decimal places (SUPRA precision)." });
+      }
+      const amount = Number(raw);
+      if (!amount || amount <= 0 || !isFinite(amount)) {
+        return res.status(400).json({ ok: false, error: "Invalid amount." });
+      }
+
+      user.wallet.balance = +(user.wallet.balance + amount).toFixed(8);
       await db.write();
       res.json(user.wallet);
     });
