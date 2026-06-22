@@ -15,7 +15,7 @@ import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clear
 const TABS = [
   { id: "setup", icon: "⚙", label: "Setup" },
   { id: "channels", icon: "📡", label: "Channels" },
-  { id: "generate", icon: "✦", label: "Generate" },
+  { id: "compose",  icon: "✦", label: "Compose" },
   { id: "automation", icon: "⚡", label: "Automation" },
   { id: "history", icon: "📋", label: "History" },
 ];
@@ -645,7 +645,6 @@ export default function App() {
   const [wallet, setWallet] = useState({ balance: 0, costPerPost: 1 });
   const [automation, setAutomation] = useState({ running: false, cycleSeconds: 21600, autoApprove: true, nextRunAt: null });
   const [stats, setStats] = useState({ totalGenerations: 0, totalPosts: 0, supraEarned: 0 });
-  const [channels, setChannels] = useState({});
 
   // ── Generate page local state
   const [tweet, setTweet] = useState("");
@@ -753,11 +752,12 @@ export default function App() {
   }
 
   /* ── Manual post ───────────────────────────────────────── */
-  async function onPost(text, imageFilename = null) {
+  // payload: { text, imageFilename, mode, targetIds }
+  async function onPost(payload) {
     try {
-      const result = await api.post("/post", { text, imageFilename });
-      setPosts((p) => [result.post, ...p]);
-      setStats((s) => ({ ...s, totalPosts: (s.totalPosts || 0) + 1 }));
+      const result = await api.post("/post", payload);
+      if (result.post) setPosts((p) => [result.post, ...p]);
+      if (result.ok) setStats((s) => ({ ...s, totalPosts: (s.totalPosts || 0) + 1 }));
       return result;
     } catch (err) {
       return { ok: false, error: err.message };
@@ -871,80 +871,25 @@ export default function App() {
     </div>
   );
 
-  /* ============================================================
-     PANEL: GENERATE
-  ============================================================ */
   const Generate = (
-    <div className="fade-up" style={{ display: "grid", gridTemplateColumns: isCompact ? "1fr" : "1fr 1fr", gap: 20, alignItems: "start" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        {!isMobile && (
-          <div>
-            <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Generate Post</div>
-            <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>The AI generates, self-critiques, then waits for your approval.</div>
-          </div>
-        )}
-        <Card eyebrow="Generation" title="Options">
-          <Field label="Custom prompt" hint="Leave blank to use your profile automatically">
-            <Input placeholder="Optional..." value={settings.customPrompt} onChange={(e) => updateSetting("customPrompt", e.target.value)} onBlur={saveSettings} />
-          </Field>
-          <Field label="Post type">
-            <Select value={settings.postType} onChange={(e) => updateSetting("postType", e.target.value)} onBlur={saveSettings}>
-              <option value="alpha">Alpha / Insight</option>
-              <option value="thread">Thread Opener</option>
-              <option value="news">News Commentary</option>
-              <option value="educational">Educational</option>
-              <option value="engagement">Engagement</option>
-            </Select>
-          </Field>
-          {enabledChannelCount > 0 && (
-            <div style={{ fontSize: "0.7rem", color: C.muted, marginBottom: 14 }}>
-              Will broadcast to {enabledChannelCount} channel{enabledChannelCount > 1 ? "s" : ""} when posted.
-            </div>
-          )}
-          <Btn full variant="primary" size="lg" onClick={handleGenerate} disabled={generating}>
-            {generating ? "Generating..." : `✦ Generate Post — ${fmt(wallet.costPerPost)} SUPRA`}
-          </Btn>
-        </Card>
-        <Card eyebrow="Pipeline" title="Generation Log">
-          <Log lines={genLog} />
-        </Card>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        {tweet ? (
-          <div className="scale-in">
-            <Card eyebrow="Quality Gate" title="Self-Critique" accentTop={C.accent} style={{ marginBottom: 18 }}>
-              {scores.map((sc) => <ScoreBar key={sc.label} {...sc} />)}
-            </Card>
-            <Card eyebrow="Preview" title="Post">
-              <TweetPreview text={editing ? editText : tweet} />
-              <div style={{ display: "flex", gap: 9, marginTop: 16, flexWrap: "wrap" }}>
-                <Btn variant="supra" style={{ flex: 1, minWidth: 140 }} onClick={() => handlePost(editing ? editText : tweet)}>🚀 Post Now</Btn>
-                <Btn variant="ghost" onClick={handleGenerate} disabled={generating}>↻ Regenerate</Btn>
-                <Btn variant="cyan" onClick={() => { setEditing((e) => !e); setEditText(tweet); }}>Edit</Btn>
-              </div>
-              {editing && (
-                <div className="fade-up" style={{ marginTop: 14 }}>
-                  <TextArea value={editText} onChange={(e) => setEditText(e.target.value)} />
-                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                    <Btn variant="supra" size="sm" onClick={() => { setTweet(editText); setEditing(false); }}>Apply</Btn>
-                    <Btn variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancel</Btn>
-                  </div>
-                </div>
-              )}
-            </Card>
-          </div>
-        ) : (
-          <Card style={{ textAlign: "center", padding: "56px 28px", border: `1.5px dashed ${C.border}`, background: "transparent" }}>
-            <div style={{ fontSize: "1.8rem", marginBottom: 10, opacity: 0.4 }}>✦</div>
-            <div style={{ fontSize: "0.86rem", color: C.muted }}>Your generated post will appear here</div>
-          </Card>
-        )}
-      </div>
-    </div>
+    <ComposePage
+      isMobile={isMobile}
+      wallet={wallet}
+      settings={settings}
+      updateSetting={updateSetting}
+      saveSettings={saveSettings}
+      channels={channels}
+      generating={generating}
+      handleGenerate={handleGenerate}
+      tweet={tweet}
+      setTweet={setTweet}
+      scores={scores}
+      genLog={genLog}
+      onPost={onPost}
+    />
   );
 
-  /* ============================================================
+    /* ============================================================
      PANEL: AUTOMATION
   ============================================================ */
   const Automation = (
@@ -1058,7 +1003,7 @@ export default function App() {
     </div>
   );
 
-  const panels = { setup: Setup, generate: Generate, automation: Automation, history: History };
+  const panels = { setup: Setup, compose: Generate, automation: Automation, history: History };
 
   /* ============================================================
      AUTH GATE — show the wallet sign-in screen until we have a session

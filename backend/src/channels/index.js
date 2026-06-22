@@ -1,29 +1,29 @@
-/**
- * Channel registry. Every platform module here implements the same
- * interface — { id, isConfigured(creds), publish(text, creds) } — so
- * adding a new social network is just: drop a new file in this folder,
- * then add one line below.
- */
-const telegram = require("./telegram");
-const twitter = require("./twitter");
+const telegram  = require("./telegram");
+const twitter   = require("./twitter");
 const instagram = require("./instagram");
-const discord = require("./discord");
+const discord   = require("./discord");
 
 const registry = { telegram, twitter, instagram, discord };
 
 /**
- * Publishes `text` to every channel that is both enabled by the user
- * (channelsState[id].enabled) and actually configured with real
- * credentials (module.isConfigured(creds)). `channelsState` is the user's
- * own channels object — { telegram: { enabled, credentials, ... }, ... } —
- * so each user's broadcast only ever touches their own tokens.
+ * Publishes a payload to channels.
+ *
+ * payload = { text, imagePath, mode }
+ *   mode: "text" | "image" | "both"
+ *
+ * channelsState = { telegram: { enabled, credentials }, ... }
+ *
+ * targetIds (optional) = ["telegram", "discord"]
+ *   When provided, only those channels are published to even if others are enabled.
+ *   Lets the user pick per-post which networks to hit.
  */
-async function publishToChannels(text, channelsState) {
+async function publishToChannels(payload, channelsState, targetIds = null) {
   const results = {};
 
   for (const [id, mod] of Object.entries(registry)) {
     const state = channelsState?.[id];
-    if (!state?.enabled) continue; // user didn't opt this channel in
+    if (!state?.enabled) continue;
+    if (targetIds && !targetIds.includes(id)) continue; // per-post override
 
     const creds = state.credentials || {};
     if (!mod.isConfigured(creds)) {
@@ -32,7 +32,7 @@ async function publishToChannels(text, channelsState) {
     }
 
     try {
-      results[id] = await mod.publish(text, creds);
+      results[id] = await mod.publish(payload, creds);
     } catch (err) {
       results[id] = { ok: false, error: err.message };
     }

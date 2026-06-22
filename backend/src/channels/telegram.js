@@ -1,21 +1,7 @@
 const axios = require("axios");
+const fs = require("fs");
+const FormData = require("form-data");
 
-/**
- * Telegram channel publisher — implements the common channel interface:
- *   isConfigured(creds) -> boolean
- *   publish(text, creds) -> { ok, ...details }
- *
- * `creds` is per-user: { botToken, chatId }, normally pasted by the user
- * into the Setup > Channels card (Telegram has no OAuth flow for bots).
- * Falls back to TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID from .env if no
- * per-user credentials are set — convenient for local single-user testing,
- * but in production each user should supply their own bot.
- *
- * How a user gets a bot token + chat id:
- *  1. Message @BotFather on Telegram, /newbot, get a token
- *  2. Send any message to their new bot
- *  3. Visit https://api.telegram.org/bot<TOKEN>/getUpdates to find their chat id
- */
 function resolveCreds(creds = {}) {
   return {
     botToken: creds.botToken || process.env.TELEGRAM_BOT_TOKEN,
@@ -28,24 +14,33 @@ function isConfigured(creds) {
   return !!(botToken && chatId);
 }
 
-async function publish(text, creds) {
+async function publish({ text, imagePath, mode }, creds) {
   const { botToken, chatId } = resolveCreds(creds);
-
-  if (!botToken || !chatId) {
-    console.warn("[telegram] Missing bot token or chat id — skipping real post");
-    return { ok: false, simulated: true, reason: "not_configured" };
-  }
+  if (!botToken || !chatId) return { ok: false, simulated: true, reason: "not_configured" };
 
   try {
+    // Image only or Text+Image → sendPhoto
+    if ((mode === "image" || mode === "both") && imagePath && fs.existsSync(imagePath)) {
+      const form = new FormData();
+      form.append("chat_id", chatId);
+      form.append("photo", fs.createReadStream(imagePath), { filename: "image.jpg", contentType: "image/jpeg" });
+      if (mode === "both" && text) {
+        form.append("caption", `📢 ${text}`);
+        form.append("parse_mode", "HTML");
+      }
+      const res = await axios.post(`https://api.telegram.org/bot${botToken}/sendPhoto`, form, { headers: form.getHeaders(), timeout: 30000 });
+      return { ok: true, data: { messageId: res.data?.result?.message_id } };
+    }
+
+    // Text only → sendMessage
     const res = await axios.post(
       `https://api.telegram.org/bot${botToken}/sendMessage`,
-      { chat_id: chatId, text, parse_mode: "HTML" },
+      { chat_id: chatId, text: `📢 ${text}`, parse_mode: "HTML" },
       { timeout: 15000 }
     );
-    return { ok: true, data: res.data };
+    return { ok: true, data: { messageId: res.data?.result?.message_id } };
   } catch (err) {
-    console.error("[telegram] Post failed:", err.response?.data || err.message);
-    return { ok: false, error: err.response?.data || err.message };
+    return { ok: false, error: err.response?.data?.description || err.message };
   }
 }
 

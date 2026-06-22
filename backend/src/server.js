@@ -155,8 +155,14 @@ async function main() {
   // ════════════════════════════════════════════════════════
   app.post("/api/generate", requireAuth, async (req, res) => {
     try {
-      const autoPost = !!req.body.autoPost; // false = just preview, true = post immediately
-      const result = await runGenerationCycle(db, req.walletAddress, { autoPost });
+      const { autoPost, mode, imageStyle, imageCustomPrompt, targetIds } = req.body;
+      const result = await runGenerationCycle(db, req.walletAddress, {
+        autoPost: !!autoPost,
+        mode: mode || "text",
+        imageStyle: imageStyle || "auto",
+        imageCustomPrompt: imageCustomPrompt || "",
+        targetIds: Array.isArray(targetIds) ? targetIds : null,
+      });
       res.json(result);
     } catch (err) {
       console.error(err);
@@ -193,19 +199,32 @@ async function main() {
     res.json(maskChannels(user.channels));
   });
 
-  // Post an already-generated (or edited) draft to every enabled channel
+  // Publish a manually composed or AI-drafted post
+  // body: { text?, imageFilename?, mode, targetIds? }
+  //   mode: "text" | "image" | "both"
+  //   targetIds: ["telegram","discord"] — optional per-post channel override
   app.post("/api/post", requireAuth, async (req, res) => {
     await db.read();
     const user = db.forUser(req.walletAddress);
-    const { text } = req.body;
-    if (!text) return res.status(400).json({ ok: false, error: "Missing text" });
+    const { text, imageFilename, mode = "text", targetIds } = req.body;
 
-    const results = await publishToChannels(`📢 New SupraPost\n\n${text}`, user.channels);
+    if (mode === "text" && !text)  return res.status(400).json({ ok: false, error: "Text required for text mode" });
+    if (mode === "image" && !imageFilename) return res.status(400).json({ ok: false, error: "Image required for image mode" });
+    if (mode === "both" && (!text || !imageFilename)) return res.status(400).json({ ok: false, error: "Text and image required for both mode" });
+
+    const imagePath = imageFilename ? require("path").join(require("./imageGen").IMAGES_DIR, imageFilename) : null;
+    const payload = { text, imagePath, mode };
+    const targets = Array.isArray(targetIds) && targetIds.length ? targetIds : null;
+
+    const results = await publishToChannels(payload, user.channels, targets);
     const anyPosted = Object.values(results).some((r) => r.ok);
 
     const post = {
       id: uuidv4(),
-      text,
+      mode,
+      text: text || null,
+      imageFilename: imageFilename || null,
+      imageUrl: imageFilename ? `/images/${imageFilename}` : null,
       time: new Date().toISOString(),
       auto: false,
       results,
@@ -215,6 +234,35 @@ async function main() {
     await db.write();
 
     res.json({ ok: true, post, results });
+  });
+
+  // ════════════════════════════════════════════════════════
+  // IMAGES — generate via AI or accept user upload
+  // ════════════════════════════════════════════════════════
+  app.get("/api/image/styles", (req, res) => {
+    const { STYLES } = require("./imageGen");
+    res.json(Object.entries(STYLES).map(([id, s]) => ({ id, label: s.label })));
+  });
+
+  app.post("/api/image/generate", requireAuth, async (req, res) => {
+    const { generateImage } = require("./imageGen");
+    const { postText, style, customPrompt, width, height } = req.body;
+    const result = await generateImage({ postText: postText || "Web3 blockchain", style, customPrompt, width, height });
+    if (result.ok) result.imageUrl = `/images/${result.imageFilename}`;
+    res.json(result);
+  });
+
+  app.post("/api/image/upload", requireAuth, (req, res) => {
+    const { saveUploadedImage } = require("./imageGen");
+    const { data, mimeType } = req.body;
+    if (!data) return res.status(400).json({ ok: false, error: "data required" });
+    try {
+      const result = saveUploadedImage(data, mimeType);
+      result.imageUrl = `/images/${result.imageFilename}`;
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
   });
 
   // ════════════════════════════════════════════════════════

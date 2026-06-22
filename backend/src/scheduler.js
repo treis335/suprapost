@@ -30,7 +30,7 @@ function scheduleNext(db, address) {
     if (!u.automation.running) return;
 
     const { autoApprove } = u.automation;
-    await runGenerationCycle(db, address, { autoPost: autoApprove });
+    await runGenerationCycle(db, address, { autoPost: autoApprove, mode: auto.mode || 'text', imageStyle: auto.imageStyle || 'auto', imageCustomPrompt: auto.imageCustomPrompt || '' });
 
     await db.read(); // re-read in case settings changed mid-cycle
     if (db.forUser(address).automation.running) {

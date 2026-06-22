@@ -17,7 +17,7 @@ import { Card } from "./Card";
 
 const MODE_ICONS = { off: "⊘", generate: "✦ AI", upload: "⬆" };
 
-export function ImagePanel({ postText, onChange, compact = false }) {
+export function ImagePanel({ postText, onChange, compact = false, forceOpen = false, eyebrow }) {
   const [mode, setMode] = useState("off");
   const [style, setStyle] = useState("auto");
   const [customPrompt, setCustomPrompt] = useState("");
@@ -106,7 +106,7 @@ export function ImagePanel({ postText, onChange, compact = false }) {
   ];
 
   return (
-    <Card eyebrow="Visual" title="Post Image" accentTop={mode !== "off" ? C.accent2 : undefined} style={{ padding: compact ? 16 : 20 }}>
+    <Card eyebrow={eyebrow || "Visual"} title="Post Image" accentTop={mode !== "off" ? C.accent2 : undefined} style={{ padding: compact ? 16 : 20 }}>
       {/* Mode tabs */}
       <div style={{ display: "flex", gap: 6, marginBottom: 16, background: C.bg, borderRadius: 10, padding: 4 }}>
         {[["off", "No Image"], ["generate", "AI Generate"], ["upload", "Upload"]].map(([m, label]) => (

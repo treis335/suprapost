@@ -1,31 +1,53 @@
-/**
- * Twitter/X channel publisher — NOT YET IMPLEMENTED.
- *
- *   isConfigured(creds) -> boolean
- *   publish(text, creds) -> { ok, ...details }
- *
- * `creds` will eventually hold per-user OAuth 2.0 access/refresh tokens
- * obtained via the Twitter OAuth flow (the user clicks "Connect Twitter",
- * is redirected to twitter.com, authorizes, and Twitter calls back with
- * tokens scoped to that user — never a raw API key typed into a form).
- *
- * To wire this up for real:
- *   1. Register a Twitter Developer App with OAuth 2.0 User Context.
- *   2. Add a /api/oauth/twitter/start + /api/oauth/twitter/callback route
- *      pair in the backend that runs the OAuth dance and stores the
- *      resulting tokens in db.forUser(address).channels.twitter.credentials.
- *   3. POST https://api.twitter.com/2/tweets using the user's access token.
- */
+const fs = require("fs");
+
 function isConfigured(creds = {}) {
-  return !!(creds.accessToken);
+  return !!(creds.apiKey && creds.apiSecret && creds.accessToken && creds.accessSecret);
 }
 
-async function publish(text, creds) {
-  if (!isConfigured(creds)) {
-    return { ok: false, simulated: true, reason: "not_configured" };
+function mkClient(creds) {
+  const { TwitterApi } = require("twitter-api-v2");
+  return new TwitterApi({
+    appKey: creds.apiKey,
+    appSecret: creds.apiSecret,
+    accessToken: creds.accessToken,
+    accessSecret: creds.accessSecret,
+  });
+}
+
+async function publish({ text, imagePath, mode }, creds) {
+  if (!isConfigured(creds)) return { ok: false, simulated: true, reason: "not_configured" };
+
+  try {
+    const client = mkClient(creds);
+    let mediaIds = undefined;
+
+    // Upload image if needed
+    const hasImage = (mode === "image" || mode === "both") && imagePath && fs.existsSync(imagePath);
+    if (hasImage) {
+      try {
+        const mediaId = await client.v1.uploadMedia(imagePath);
+        mediaIds = [mediaId];
+      } catch (e) {
+        console.warn("[twitter] media upload failed:", e.message);
+      }
+    }
+
+    // Build tweet payload
+    const payload = {};
+    if (mode === "text" || mode === "both") {
+      const body = (text || "").length > 280 ? text.slice(0, 277) + "..." : text;
+      payload.text = body;
+    }
+    if (mediaIds) payload.media = { media_ids: mediaIds };
+
+    // Twitter v2 requires at least text or media
+    if (!payload.text && !payload.media) return { ok: false, error: "Nothing to post" };
+
+    const res = await client.v2.tweet(payload);
+    return { ok: true, data: { id: res.data.id }, url: `https://x.com/i/web/status/${res.data.id}` };
+  } catch (err) {
+    return { ok: false, error: err.data?.detail || err.message };
   }
-  // TODO: implement real Twitter API v2 call here using creds.accessToken.
-  return { ok: false, error: "Twitter publishing not implemented yet" };
 }
 
 module.exports = { id: "twitter", isConfigured, publish };

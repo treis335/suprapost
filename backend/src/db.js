@@ -39,9 +39,12 @@ function freshUserData() {
     },
     automation: {
       running: false,
-      cycleSeconds: 21600, // 6h default
+      cycleSeconds: 21600,
       autoApprove: true,
       nextRunAt: null,
+      mode: "text",       // "text" | "image" | "both"
+      imageStyle: "auto",
+      imageCustomPrompt: "",
     },
     wallet: {
       balance: 50, // simulated SUPRA balance for now — real balance will be read on-chain later
