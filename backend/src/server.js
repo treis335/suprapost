@@ -29,10 +29,16 @@ function maskChannels(channels) {
 
 async function main() {
   const db = await initDB();
-  const app = express();
 
+  // Clean up images older than 7 days on startup
+  cleanOldImages(7);
+
+  const app = express();
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: "20mb" })); // generous limit for base64 image uploads
+
+  // Serve generated/uploaded images so Discord embeds and previews work
+  app.use("/images", express.static(IMAGES_DIR));
 
   // ── Resume automation for every user who had it running ──
   resumeAllAutomations(db);
@@ -276,11 +282,7 @@ async function main() {
     });
     console.log(`[server] Serving built frontend from ${FRONTEND_DIST}`);
   } else {
-    app.get("/", (req, res) => {
-      res.send(
-        "<h2>SupraPost backend is running.</h2><p>Frontend not built yet — run <code>npm run build</code> in /frontend, or run the frontend dev server separately on its own port (e.g. http://localhost:5173).</p>"
-      );
-    });
+    app.get("/", (req, res) => res.send("<h2>SupraPost backend running.</h2><p>Build the frontend first.</p>"));
   }
 
   app.listen(PORT, () => {
@@ -289,7 +291,4 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error("Fatal error starting server:", err);
-  process.exit(1);
-});
+main().catch((err) => { console.error("Fatal:", err); process.exit(1); });

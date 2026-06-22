@@ -12,27 +12,13 @@ import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clear
    broadcasting, smoother tab transitions, and tighter polish
    throughout (hover depth, focus rings, spacing rhythm).
 ============================================================ */
-const C = {
-  bg: "#08070d",
-  bgGrad: "radial-gradient(ellipse 120% 80% at 50% -10%, #14101f 0%, #08070d 55%)",
-  surface: "#100e1a",
-  surface2: "#171328",
-  raised: "#1c1830",
-  border: "#231f38",
-  borderLight: "#332c52",
-  accent: "#9b6bff",
-  accentDeep: "#7c4cf0",
-  accent2: "#3ed9d0",
-  supra: "#3ddc91",
-  warn: "#f5b942",
-  danger: "#ff6b81",
-  text: "#f1eefc",
-  text2: "#a59cc7",
-  muted: "#5f5783",
-  display: "'Space Grotesk', 'Inter', sans-serif",
-  sans: "'Inter', -apple-system, sans-serif",
-  mono: "'JetBrains Mono', 'Space Mono', monospace",
-};
+const TABS = [
+  { id: "setup", icon: "⚙", label: "Setup" },
+  { id: "channels", icon: "📡", label: "Channels" },
+  { id: "generate", icon: "✦", label: "Generate" },
+  { id: "automation", icon: "⚡", label: "Automation" },
+  { id: "history", icon: "📋", label: "History" },
+];
 
 const fmt = (n) => Number(n ?? 0).toFixed(2);
 
@@ -655,21 +641,19 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
 
   const [settings, setSettings] = useState({ niche: "", tone: "technical", audience: "", examples: "", avoid: "", postType: "alpha", customPrompt: "" });
+  const [channels, setChannels] = useState([]);
   const [wallet, setWallet] = useState({ balance: 0, costPerPost: 1 });
   const [automation, setAutomation] = useState({ running: false, cycleSeconds: 21600, autoApprove: true, nextRunAt: null });
-  const [posts, setPosts] = useState([]);
   const [stats, setStats] = useState({ totalGenerations: 0, totalPosts: 0, supraEarned: 0 });
   const [channels, setChannels] = useState({});
 
-  const [generating, setGenerating] = useState(false);
+  // ── Generate page local state
   const [tweet, setTweet] = useState("");
   const [scores, setScores] = useState([]);
   const [genLog, setGenLog] = useState([]);
+  const [generating, setGenerating] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
-  const [countdown, setCountdown] = useState("");
-  const [progress, setProgress] = useState(0);
-  const cdRef = useRef(null);
 
   function handleSignOut() {
     clearSession();
@@ -697,20 +681,24 @@ export default function App() {
     return () => clearInterval(interval);
   }, [refreshAll, session]);
 
+  /* ── Automation orbit ring ─────────────────────────────── */
   useEffect(() => {
-    if (cdRef.current) clearInterval(cdRef.current);
-    if (!automation.running || !automation.nextRunAt) { setCountdown(""); setProgress(0); return; }
-    const totalMs = automation.cycleSeconds * 1000;
+    clearInterval(timerRef.current);
+    if (!automation.running || !automation.nextRunAt) {
+      setProgress(0); setCountdown("—"); return;
+    }
     const tick = () => {
-      const rem = Math.max(0, new Date(automation.nextRunAt).getTime() - Date.now());
-      const h = Math.floor(rem / 3600000), m = Math.floor((rem % 3600000) / 60000), s = Math.floor((rem % 60000) / 1000);
-      setCountdown(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
-      setProgress(Math.min(1, Math.max(0, 1 - rem / totalMs)));
+      const now = Date.now();
+      const next = new Date(automation.nextRunAt).getTime();
+      const total = automation.cycleSeconds * 1000;
+      const elapsed = total - (next - now);
+      setProgress(Math.max(0, Math.min(1, elapsed / total)));
+      setCountdown(fmtCountdown(next - now));
     };
     tick();
-    cdRef.current = setInterval(tick, 1000);
-    return () => clearInterval(cdRef.current);
-  }, [automation.running, automation.nextRunAt, automation.cycleSeconds]);
+    timerRef.current = setInterval(tick, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [automation]);
 
   function updateSetting(key, value) { setSettings((s) => ({ ...s, [key]: value })); }
   async function saveSettings() { const updated = await api.post("/settings", settings); setSettings(updated); }
@@ -723,35 +711,74 @@ export default function App() {
     setChannels(updated);
   }
 
+  /* ── Wallet ────────────────────────────────────────────── */
+  async function topUp(n) {
+    try { const w = await api.post("/wallet/topup", { amount: n }); setWallet(w); } catch {}
+  }
+
+  /* ── Channels ──────────────────────────────────────────── */
+  async function onSaveChannel(id, values) {
+    try {
+      const updated = await api.post(`/channels/${id}`, values);
+      setChannels((prev) => prev.map((c) => (c.id === id ? updated : c)));
+    } catch {}
+  }
+  async function onTestChannel(id) {
+    try { return await api.post(`/channels/${id}/test`); } catch (err) { return { ok: false, error: err.message }; }
+  }
+
+  /* ── Generate ──────────────────────────────────────────── */
   async function handleGenerate() {
-    setGenerating(true); setTweet(""); setScores([]); setGenLog([]);
-    await saveSettings();
-    const result = await api.post("/generate", { autoPost: false });
-    if (result.ok) {
-      setTweet(result.post.text); setScores(result.post.scores); setGenLog(result.log);
-    } else {
-      setGenLog([{ time: new Date().toISOString(), msg: `✕ ${result.reason || "generation failed"}` }]);
+    setGenerating(true);
+    setGenLog([]);
+    setTweet("");
+    setScores([]);
+    setEditing(false);
+    try {
+      const data = await api.post("/generate", { autoPost: false });
+      if (data.ok && data.post) {
+        setTweet(data.post.text);
+        setEditText(data.post.text);
+        if (data.post.scores) setScores(data.post.scores);
+        if (data.log) setGenLog(data.log);
+        setWallet((w) => ({ ...w, balance: Math.max(0, w.balance - (w.costPerPost || 1)) }));
+        setStats((s) => ({ ...s, totalGenerations: (s.totalGenerations || 0) + 1 }));
+      } else if (data.log) {
+        setGenLog(data.log);
+      }
+    } catch (err) {
+      setGenLog([{ time: new Date().toISOString(), msg: `✕ Error: ${err.message}` }]);
     }
-    await refreshAll();
     setGenerating(false);
   }
 
-  async function handlePost(text = tweet) {
-    const result = await api.post("/post", { text });
-    if (result.ok) { setTweet(""); setScores([]); setEditing(false); await refreshAll(); }
+  /* ── Manual post ───────────────────────────────────────── */
+  async function onPost(text, imageFilename = null) {
+    try {
+      const result = await api.post("/post", { text, imageFilename });
+      setPosts((p) => [result.post, ...p]);
+      setStats((s) => ({ ...s, totalPosts: (s.totalPosts || 0) + 1 }));
+      return result;
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
   }
 
-  async function saveAutomationSettings(patch) { const updated = await api.post("/automation/settings", patch); setAutomation(updated); }
-  async function startAuto() { const a = await api.post("/automation/start"); setAutomation(a); }
-  async function stopAuto() { const a = await api.post("/automation/stop"); setAutomation(a); }
-  async function clearHistory() { await api.del("/posts"); await refreshAll(); }
+  /* ── Automation ────────────────────────────────────────── */
+  async function startAuto() {
+    try { const a = await api.post("/automation/start"); setAutomation(a); } catch {}
+  }
+  async function stopAuto() {
+    try { const a = await api.post("/automation/stop"); setAutomation(a); } catch {}
+  }
+  async function saveAutomationSettings(patch) {
+    try { const a = await api.post("/automation/settings", patch); setAutomation(a); } catch {}
+  }
 
-  const TABS = [
-    { id: "setup", icon: "⚙", label: "Setup" },
-    { id: "generate", icon: "✦", label: "Generate" },
-    { id: "automation", icon: "↻", label: "Automation" },
-    { id: "history", icon: "▤", label: "History" },
-  ];
+  /* ── History ───────────────────────────────────────────── */
+  async function clearHistory() {
+    try { await api.del("/posts"); setPosts([]); setStats((s) => ({ ...s, totalPosts: 0 })); } catch {}
+  }
 
   const enabledChannelCount = Object.values(channels).filter((c) => c.enabled && c.connected).length;
   const channelGridCols = isMobile ? "1fr" : "1fr 1fr";
@@ -1045,7 +1072,7 @@ export default function App() {
   ============================================================ */
   if (isMobile) {
     return (
-      <div style={{ background: C.bgGrad, color: C.text, minHeight: "100vh", fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
+      <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans }}>
         <GlobalStyle />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.85)", backdropFilter: "blur(10px)", position: "sticky", top: 0, zIndex: 100 }}>
           <div style={{ fontWeight: 700, fontSize: "1.1rem", fontFamily: C.display }}>Supra<span style={{ color: C.accent }}>Post</span></div>
@@ -1114,7 +1141,7 @@ export default function App() {
 
   // Desktop: full 3-column layout (sidebar + content + context rail)
   return (
-    <div style={{ background: C.bgGrad, color: C.text, minHeight: "100vh", fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
       <GlobalStyle />
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 32px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.6)", backdropFilter: "blur(10px)" }}>

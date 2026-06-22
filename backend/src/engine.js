@@ -34,12 +34,32 @@ async function runGenerationCycle(db, address, { autoPost }) {
   user.stats.supraEarned = +(user.stats.supraEarned + wallet.costPerPost).toFixed(2);
   push(`⬡ Charged ${wallet.costPerPost} SUPRA — balance now ${wallet.balance}`);
 
-  // 2. generate
-  push("🤖 Generating post via DeepSeek...");
+  // 2. generate text
+  push("🤖 Generating post text via DeepSeek...");
   const text = await generatePost(settings);
-  push("✓ Draft generated");
+  push("✓ Text generated");
 
-  // 3. self-critique
+  // 3. optionally generate image
+  let imagePath = null;
+  let imageFilename = null;
+  let imagePrompt = null;
+
+  if (withImage) {
+    push(`🖼 Generating image (style: ${imageStyle})...`);
+    const imgResult = await generateImage({ postText: text, style: imageStyle, customPrompt: imageCustomPrompt });
+    if (imgResult.ok) {
+      imagePath = imgResult.imagePath;
+      imageFilename = imgResult.imageFilename;
+      imagePrompt = imgResult.prompt;
+      push(`✓ Image generated → ${imageFilename}`);
+    } else if (imgResult.simulated) {
+      push(`⚠ Image skipped — TOGETHER_API_KEY not set`);
+    } else {
+      push(`⚠ Image failed: ${imgResult.error}`);
+    }
+  }
+
+  // 4. self-critique
   const { scores, avg } = scorePost();
   push(`🧠 Self-critique score: ${avg}/10`);
 

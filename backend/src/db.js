@@ -102,10 +102,41 @@ class JsonDB {
 
 const db = new JsonDB(file, defaultData);
 
+/**
+ * Merges saved data on top of fresh defaults, one level deep, so that
+ * new top-level keys (e.g. a config block for a brand new channel)
+ * automatically appear for users with an older db.json — without
+ * clobbering values the user already configured for existing ones.
+ */
+function mergeDefaults(saved) {
+  const merged = { ...JSON.parse(JSON.stringify(defaultData)), ...saved };
+  merged.channels = { ...JSON.parse(JSON.stringify(defaultData.channels)), ...(saved.channels || {}) };
+  for (const channelId of Object.keys(defaultData.channels)) {
+    merged.channels[channelId] = { ...defaultData.channels[channelId], ...(saved.channels?.[channelId] || {}) };
+  }
+  return merged;
+}
+
+/**
+ * One-time convenience: if the classic .env Telegram credentials are
+ * present and the dashboard hasn't been configured yet, seed the
+ * Telegram channel from them so existing setups keep working with
+ * zero migration steps.
+ */
+function seedFromEnv(data) {
+  const t = data.channels.telegram;
+  if (process.env.TELEGRAM_BOT_TOKEN && !t.botToken) {
+    t.botToken = process.env.TELEGRAM_BOT_TOKEN;
+    t.chatId = process.env.TELEGRAM_CHAT_ID || t.chatId;
+    t.enabled = true;
+  }
+  return data;
+}
+
 async function initDB() {
   fs.mkdirSync(dataDir, { recursive: true });
   if (!fs.existsSync(file)) {
-    db.data = JSON.parse(JSON.stringify(defaultData));
+    db.data = seedFromEnv(JSON.parse(JSON.stringify(defaultData)));
     await db.write();
     return db;
   }
