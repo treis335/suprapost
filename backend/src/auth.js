@@ -2,6 +2,15 @@ const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const ed25519 = require("@noble/ed25519");
 
+// v1.x requires sha512Sync to be set for Node.js environments without
+// native WebCrypto. Use Node's built-in crypto module.
+const { createHash } = require("crypto");
+ed25519.utils.sha512Sync = (...msgs) => {
+  const hash = createHash("sha512");
+  for (const msg of msgs) hash.update(msg);
+  return Uint8Array.from(hash.digest());
+};
+
 const JWT_SECRET = process.env.JWT_SECRET || "dev-only-insecure-secret-change-me";
 const JWT_EXPIRY = "7d";
 const NONCE_TTL_MS = 5 * 60 * 1000; // 5 minutes to complete the sign-in
@@ -77,7 +86,7 @@ async function verifySupraSignature(message, signaturePayload, address) {
   const sigBytes = hexToBytes(signature);
   const pubKeyBytes = hexToBytes(publicKey);
 
-  const sigValid = await ed25519.verifyAsync(sigBytes, msgBytes, pubKeyBytes);
+  const sigValid = await ed25519.verify(sigBytes, msgBytes, pubKeyBytes);
   if (!sigValid) return false;
 
   // Confirm the public key actually corresponds to the claimed address.
