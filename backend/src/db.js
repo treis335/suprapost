@@ -139,7 +139,10 @@ function seedFromEnv(data) {
 async function initDB() {
   fs.mkdirSync(dataDir, { recursive: true });
   if (!fs.existsSync(file)) {
-    db.data = seedFromEnv(JSON.parse(JSON.stringify(defaultData)));
+    // Fresh install: seed a "legacy" user from .env Telegram credentials if present
+    const fresh = freshUserData();
+    seedFromEnv(fresh);
+    db.data = { users: { legacy: fresh } };
     await db.write();
     return db;
   }

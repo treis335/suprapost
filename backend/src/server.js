@@ -10,6 +10,7 @@ const { startAutomation, stopAutomation, resumeAllAutomations } = require("./sch
 const { publishToChannels } = require("./channels");
 const { createNonce, verifyAndIssueToken, requireAuth } = require("./auth");
 const { createDepositIntent, getIntentStatus, pollForDeposits } = require("./deposits");
+const { cleanOldImages, IMAGES_DIR } = require("./imageGen");
 
 const PORT = process.env.PORT || 3001;
 const FRONTEND_DIST = path.join(__dirname, "..", "..", "frontend", "dist");
