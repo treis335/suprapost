@@ -9,6 +9,7 @@ const { runGenerationCycle } = require("./engine");
 const { startAutomation, stopAutomation, resumeAllAutomations } = require("./scheduler");
 const { publishToChannels } = require("./channels");
 const { createNonce, verifyAndIssueToken, requireAuth } = require("./auth");
+const { createDepositIntent, getIntentStatus, pollForDeposits } = require("./deposits");
 
 const PORT = process.env.PORT || 3001;
 const FRONTEND_DIST = path.join(__dirname, "..", "..", "frontend", "dist");
@@ -35,6 +36,18 @@ async function main() {
 
   // ── Resume automation for every user who had it running ──
   resumeAllAutomations(db);
+
+  // ── Poll for incoming SUPRA deposits every 20s, if a deposit address
+  // is configured. This is what turns a pending deposit intent into a
+  // credited balance, without ever holding the user's private key. ──
+  if (process.env.SUPRA_DEPOSIT_ADDRESS) {
+    setInterval(() => {
+      pollForDeposits(db).catch((err) => console.error("[deposits] Poll error:", err.message));
+    }, 20000);
+    console.log(`[server] Watching for deposits to ${process.env.SUPRA_DEPOSIT_ADDRESS}`);
+  } else {
+    console.log("[server] SUPRA_DEPOSIT_ADDRESS not set — real deposits disabled, dev top-up only");
+  }
 
   // ════════════════════════════════════════════════════════
   // AUTH — wallet-based sign-in (no passwords, no emails)
@@ -85,20 +98,50 @@ async function main() {
   });
 
   // ════════════════════════════════════════════════════════
-  // WALLET — balance, top-up (simulated SUPRA for now)
+  // WALLET — balance, top-up
   // ════════════════════════════════════════════════════════
   app.get("/api/wallet", requireAuth, async (req, res) => {
     await db.read();
     res.json(db.forUser(req.walletAddress).wallet);
   });
 
-  app.post("/api/wallet/topup", requireAuth, async (req, res) => {
-    await db.read();
-    const user = db.forUser(req.walletAddress);
-    const amount = Number(req.body.amount) || 10;
-    user.wallet.balance = +(user.wallet.balance + amount).toFixed(2);
-    await db.write();
-    res.json(user.wallet);
+  // DEV-ONLY simulated top-up — adds balance with no real transaction.
+  // Keep this disabled (or remove the route) before going live with real
+  // users, otherwise anyone could give themselves free SUPRA balance.
+  if (process.env.ALLOW_SIMULATED_TOPUP === "true") {
+    app.post("/api/wallet/topup", requireAuth, async (req, res) => {
+      await db.read();
+      const user = db.forUser(req.walletAddress);
+      const amount = Number(req.body.amount) || 10;
+      user.wallet.balance = +(user.wallet.balance + amount).toFixed(2);
+      await db.write();
+      res.json(user.wallet);
+    });
+  }
+
+  // ── Real, non-custodial deposits ──
+  // Step 1: user requests an intent for an amount they want to deposit.
+  // We hand back a precise amount (with a unique decimal fingerprint) and
+  // our deposit address — the user then sends EXACTLY that amount from
+  // their own wallet, paying their own gas.
+  app.post("/api/wallet/deposit/intent", requireAuth, async (req, res) => {
+    try {
+      const amount = Number(req.body.amount);
+      const intent = createDepositIntent(req.walletAddress, amount);
+      res.json({ ok: true, intent });
+    } catch (err) {
+      res.status(400).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Step 2: frontend polls this while waiting for the user to complete
+  // the transfer in their wallet, to know when it's been detected and
+  // credited (or to show "still waiting...").
+  app.get("/api/wallet/deposit/intent/:id", requireAuth, async (req, res) => {
+    const intent = getIntentStatus(req.params.id);
+    if (!intent) return res.status(404).json({ ok: false, error: "Unknown or expired deposit intent" });
+    if (intent.userAddress !== req.walletAddress) return res.status(403).json({ ok: false, error: "Not your deposit intent" });
+    res.json({ ok: true, intent });
   });
 
   // ════════════════════════════════════════════════════════

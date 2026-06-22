@@ -68,6 +68,20 @@ const api = {
   },
 };
 
+async function createDepositIntent(amount) {
+  const res = await fetch("/api/wallet/deposit/intent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ amount }),
+  });
+  return res.json();
+}
+
+async function getDepositIntentStatus(id) {
+  const res = await fetch(`/api/wallet/deposit/intent/${id}`, { headers: { ...authHeaders() } });
+  return res.json();
+}
+
 /* ============================================================
    RESPONSIVE — 3 tiers: mobile (<700), tablet (700-1080), desktop (1080+)
 ============================================================ */
@@ -467,6 +481,84 @@ function ChannelRow({ id, channel, onToggle, onSaveCredentials }) {
 }
 
 /* ============================================================
+   TOP UP FLOW — non-custodial deposit.
+   User picks an amount -> we get back a precise amount + our deposit
+   address -> user sends that EXACT amount from their own wallet ->
+   we poll until the backend confirms it saw the transaction on-chain.
+============================================================ */
+function TopUpFlow({ onCredited }) {
+  const [step, setStep] = useState("pick"); // pick | waiting | confirmed | error
+  const [amount, setAmount] = useState(10);
+  const [intent, setIntent] = useState(null);
+  const [error, setError] = useState("");
+  const pollRef = useRef(null);
+
+  async function startDeposit() {
+    setError("");
+    const res = await createDepositIntent(Number(amount));
+    if (!res.ok) { setError(res.error || "Could not create deposit"); return; }
+    setIntent(res.intent);
+    setStep("waiting");
+    pollRef.current = setInterval(async () => {
+      const status = await getDepositIntentStatus(res.intent.id);
+      if (status.ok && status.intent.fulfilled) {
+        clearInterval(pollRef.current);
+        setStep("confirmed");
+        onCredited?.();
+      }
+    }, 4000);
+  }
+
+  useEffect(() => () => clearInterval(pollRef.current), []);
+
+  function reset() {
+    clearInterval(pollRef.current);
+    setStep("pick"); setIntent(null); setError("");
+  }
+
+  if (step === "pick") {
+    return (
+      <div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <Input type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ flex: 1 }} />
+          <Btn variant="supra" onClick={startDeposit}>Deposit</Btn>
+        </div>
+        {error && <div style={{ fontSize: "0.74rem", color: C.danger }}>{error}</div>}
+      </div>
+    );
+  }
+
+  if (step === "waiting") {
+    return (
+      <div className="fade-up">
+        <div style={{ fontSize: "0.78rem", color: C.text2, marginBottom: 10, lineHeight: 1.6 }}>
+          Send <b style={{ color: C.supra, fontFamily: C.mono }}>{intent.encodedAmount}</b> SUPRA (exact amount — this includes a unique fingerprint, don't round it) from your wallet to:
+        </div>
+        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", fontFamily: C.mono, fontSize: "0.76rem", wordBreak: "break-all", marginBottom: 12 }}>
+          {intent.depositAddress}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.76rem", color: C.muted }}>
+          <span className="spinner-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: C.accent, animation: "softPulse 1.2s ease-in-out infinite" }} />
+          Watching the chain for your transaction...
+        </div>
+        <Btn variant="ghost" size="sm" style={{ marginTop: 12 }} onClick={reset}>Cancel</Btn>
+      </div>
+    );
+  }
+
+  if (step === "confirmed") {
+    return (
+      <div className="scale-in">
+        <div style={{ fontSize: "0.84rem", color: C.supra, fontWeight: 600, marginBottom: 10 }}>✓ Deposit confirmed and credited</div>
+        <Btn variant="ghost" size="sm" onClick={reset}>Make another deposit</Btn>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+/* ============================================================
    LOGIN SCREEN — wallet-based sign-in, no passwords or emails.
    Connect StarKey -> sign a one-time message -> backend verifies and
    issues a session. This IS the account system: the wallet address is
@@ -706,12 +798,20 @@ export default function App() {
       </Card>
 
       <Card eyebrow="Payments" title="SUPRA Wallet" accentTop={C.supra}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <div style={{ fontFamily: C.mono, fontSize: "1.7rem", color: C.supra, fontWeight: 600 }}>{fmt(wallet.balance)} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span></div>
-            <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 4 }}>Cost per post: {fmt(wallet.costPerPost)} SUPRA · simulated for now</div>
-          </div>
-          <Btn variant="supra" onClick={() => topUp(10)}>+ 10 SUPRA</Btn>
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontFamily: C.mono, fontSize: "1.7rem", color: C.supra, fontWeight: 600 }}>{fmt(wallet.balance)} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span></div>
+          <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 4 }}>Cost per post: {fmt(wallet.costPerPost)} SUPRA</div>
+        </div>
+
+        <div style={{ height: 1, background: C.border, marginBottom: 16 }} />
+
+        <div style={{ fontSize: "0.78rem", fontWeight: 600, marginBottom: 10 }}>Deposit SUPRA</div>
+        <TopUpFlow onCredited={refreshAll} />
+
+        <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 14, lineHeight: 1.6 }}>
+          Deposits are non-custodial — you sign the transfer from your own
+          wallet, and we never hold your private key. Once the network
+          confirms it, your balance updates automatically.
         </div>
       </Card>
 
@@ -1049,7 +1149,7 @@ export default function App() {
             <div style={{ fontSize: "0.64rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Balance</div>
             <div style={{ fontFamily: C.mono, fontSize: "1.5rem", color: C.supra, fontWeight: 600, marginTop: 5 }}>{fmt(wallet.balance)}</div>
             <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 3 }}>SUPRA tokens</div>
-            <Btn full variant="supra" size="sm" style={{ marginTop: 12 }} onClick={() => topUp(10)}>+ Add 10 SUPRA</Btn>
+            <Btn full variant="supra" size="sm" style={{ marginTop: 12 }} onClick={() => setTab("setup")}>Deposit SUPRA</Btn>
           </Card>
 
           <div style={{ fontSize: "0.62rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.15em", padding: "18px 14px 9px" }}>Channels</div>
