@@ -648,7 +648,15 @@ export default function App() {
   const [automation, setAutomation] = useState({ running: false, cycleSeconds: 21600, autoApprove: true, nextRunAt: null });
   const [stats, setStats] = useState({ totalGenerations: 0, totalPosts: 0, supraEarned: 0 });
 
-  // ── Generate page local state
+  // ── Posts + history
+  const [posts, setPosts] = useState([]);
+
+  // ── Orbit ring (automation countdown)
+  const [progress, setProgress] = useState(0);
+  const [countdown, setCountdown] = useState("—");
+  const timerRef = useRef(null);
+
+  // ── Generate / Compose page local state
   const [tweet, setTweet] = useState("");
   const [scores, setScores] = useState([]);
   const [genLog, setGenLog] = useState([]);
