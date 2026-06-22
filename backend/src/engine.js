@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require("uuid");
 const { generatePost, scorePost } = require("./deepseek");
-const { postToTelegram } = require("./telegram");
+const { publishToChannels, ORDER: CHANNEL_ORDER } = require("./channels");
 
 /**
  * Runs one full generation cycle:
@@ -8,7 +8,7 @@ const { postToTelegram } = require("./telegram");
  *  2. Deduct cost
  *  3. Generate text via DeepSeek
  *  4. Self-critique score
- *  5. Optionally auto-post to Telegram
+ *  5. Optionally auto-post to every enabled channel (Telegram, Discord, X, ...)
  *
  * Returns the created post object (whether posted or just drafted).
  */
@@ -20,7 +20,7 @@ async function runGenerationCycle(db, { autoPost }) {
   };
 
   await db.read();
-  const { wallet, settings } = db.data;
+  const { wallet, settings, channels } = db.data;
 
   if (wallet.balance < wallet.costPerPost) {
     push("✕ Insufficient SUPRA balance — cycle aborted");
@@ -51,33 +51,36 @@ async function runGenerationCycle(db, { autoPost }) {
     time: new Date().toISOString(),
     auto: autoPost,
     posted: false,
+    channelResults: {},
   };
 
-  // 4. post if requested
+  // 4. post to every enabled, configured channel
   if (autoPost) {
-    push("🚀 Posting to Telegram...");
-    const result = await postToTelegram(formatForTelegram(text));
-    post.posted = result.ok;
-    post.telegramResult = result.ok ? "sent" : result.simulated ? "simulated (no bot configured)" : "failed";
-    push(post.posted ? "✓ Posted successfully" : `⚠ Post not sent (${post.telegramResult})`);
-    db.data.stats.totalPosts += 1;
+    const enabledIds = CHANNEL_ORDER.filter((id) => channels[id]?.enabled);
+
+    if (enabledIds.length === 0) {
+      push("⚠ No channels enabled — draft saved without publishing");
+    } else {
+      push(`🚀 Publishing to ${enabledIds.length} channel(s): ${enabledIds.join(", ")}...`);
+      const results = await publishToChannels(text, channels);
+      post.channelResults = results;
+
+      for (const channelId of Object.keys(results)) {
+        const r = results[channelId];
+        if (r.ok) push(`✓ ${channelId} — posted`);
+        else if (r.simulated) push(`⚠ ${channelId} — skipped (not configured)`);
+        else push(`✕ ${channelId} — failed: ${r.error || "unknown error"}`);
+      }
+
+      post.posted = Object.values(results).some((r) => r.ok);
+      if (post.posted) db.data.stats.totalPosts += 1;
+    }
   }
 
   db.data.posts.unshift(post);
   await db.write();
 
   return { ok: true, post, log };
-}
-
-function formatForTelegram(text) {
-  return `📢 <b>New SupraPost</b>\n\n${escapeHtml(text)}`;
-}
-
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 module.exports = { runGenerationCycle };

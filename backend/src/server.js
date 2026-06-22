@@ -1,13 +1,41 @@
 require("dotenv").config();
 const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const { initDB } = require("./db");
 const { runGenerationCycle } = require("./engine");
 const { startAutomation, stopAutomation } = require("./scheduler");
+const channels = require("./channels");
 
 const PORT = process.env.PORT || 3001;
 const FRONTEND_DIST = path.join(__dirname, "..", "..", "frontend", "dist");
+
+/** Masks secret fields so tokens never round-trip to the browser in plaintext. */
+function maskChannelValues(fields, cfg = {}) {
+  const out = {};
+  for (const f of fields) {
+    const v = cfg[f.key] || "";
+    out[f.key] = f.type === "password" && v ? "•".repeat(Math.min(v.length, 12)) : v;
+  }
+  return out;
+}
+
+function serializeChannel(channel, cfg) {
+  return {
+    id: channel.id,
+    name: channel.meta.name,
+    icon: channel.meta.icon,
+    color: channel.meta.color,
+    description: channel.meta.description,
+    helpUrl: channel.meta.helpUrl,
+    comingSoon: !!channel.meta.comingSoon,
+    fields: channel.meta.fields,
+    enabled: !!cfg.enabled,
+    configured: channel.isConfigured(cfg),
+    values: maskChannelValues(channel.meta.fields, cfg),
+  };
+}
 
 async function main() {
   const db = await initDB();
@@ -35,6 +63,52 @@ async function main() {
     db.data.settings = { ...db.data.settings, ...req.body };
     await db.write();
     res.json(db.data.settings);
+  });
+
+  // ════════════════════════════════════════════════════════
+  // CHANNELS — per-network config (Telegram, Discord, X, Instagram, ...)
+  // Scales to new social networks without touching this file: add a
+  // module under backend/src/channels/ and register it in the index.
+  // ════════════════════════════════════════════════════════
+  app.get("/api/channels", async (req, res) => {
+    await db.read();
+    const list = channels.list().map((channel) => serializeChannel(channel, db.data.channels[channel.id] || {}));
+    res.json(list);
+  });
+
+  app.post("/api/channels/:id", async (req, res) => {
+    await db.read();
+    const channel = channels.get(req.params.id);
+    if (!channel) return res.status(404).json({ ok: false, error: "Unknown channel" });
+
+    const cfg = db.data.channels[req.params.id] || {};
+    const body = req.body || {};
+
+    for (const f of channel.meta.fields) {
+      const incoming = body[f.key];
+      // ignore masked placeholders ("••••") coming back unedited from the UI
+      if (typeof incoming === "string" && incoming.length && !incoming.includes("•")) {
+        cfg[f.key] = incoming;
+      }
+    }
+    if (typeof body.enabled === "boolean") cfg.enabled = body.enabled;
+
+    db.data.channels[req.params.id] = cfg;
+    await db.write();
+    res.json(serializeChannel(channel, cfg));
+  });
+
+  app.post("/api/channels/:id/test", async (req, res) => {
+    await db.read();
+    const channel = channels.get(req.params.id);
+    if (!channel) return res.status(404).json({ ok: false, error: "Unknown channel" });
+
+    const cfg = db.data.channels[req.params.id] || {};
+    if (!channel.isConfigured(cfg)) {
+      return res.json({ ok: false, simulated: true, reason: "not_configured" });
+    }
+    const result = await channel.test(cfg);
+    res.json(result);
   });
 
   // ════════════════════════════════════════════════════════
@@ -67,27 +141,36 @@ async function main() {
     }
   });
 
-  // Post an already-generated (or edited) draft on demand
+  // Post an already-generated (or edited) draft on demand, to every
+  // enabled channel (or a specific subset via { channels: ["telegram"] })
   app.post("/api/post", async (req, res) => {
     await db.read();
-    const { text } = req.body;
+    const { text, channels: only } = req.body;
     if (!text) return res.status(400).json({ ok: false, error: "Missing text" });
 
-    const { postToTelegram } = require("./telegram");
-    const result = await postToTelegram(`📢 <b>New SupraPost</b>\n\n${text}`);
+    const targetConfig = { ...db.data.channels };
+    if (Array.isArray(only) && only.length) {
+      for (const id of Object.keys(targetConfig)) {
+        targetConfig[id] = { ...targetConfig[id], enabled: only.includes(id) && targetConfig[id].enabled };
+      }
+    }
+
+    const channelResults = await channels.publishToChannels(text, targetConfig);
+    const posted = Object.values(channelResults).some((r) => r.ok);
 
     const post = {
       id: require("uuid").v4(),
       text,
       time: new Date().toISOString(),
       auto: false,
-      posted: result.ok,
+      posted,
+      channelResults,
     };
     db.data.posts.unshift(post);
-    db.data.stats.totalPosts += 1;
+    if (posted) db.data.stats.totalPosts += 1;
     await db.write();
 
-    res.json({ ok: true, post, telegram: result });
+    res.json({ ok: true, post });
   });
 
   // ════════════════════════════════════════════════════════
@@ -147,7 +230,6 @@ async function main() {
   // ════════════════════════════════════════════════════════
   // SERVE FRONTEND (built React app) — same origin, no CORS needed
   // ════════════════════════════════════════════════════════
-  const fs = require("fs");
   if (fs.existsSync(FRONTEND_DIST)) {
     app.use(express.static(FRONTEND_DIST));
     // SPA fallback: any non-/api route returns index.html

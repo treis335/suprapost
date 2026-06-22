@@ -15,6 +15,15 @@ const defaultData = {
     postType: "alpha",
     customPrompt: "",
   },
+  // per-network publishing config. Each key matches a channel id in
+  // backend/src/channels/. New networks just need a new key here +
+  // a matching module — server.js and engine.js stay untouched.
+  channels: {
+    telegram: { enabled: true, botToken: "", chatId: "" },
+    discord: { enabled: false, webhookUrl: "" },
+    twitter: { enabled: false, apiKey: "", apiSecret: "", accessToken: "", accessSecret: "" },
+    instagram: { enabled: false, accessToken: "", igUserId: "" },
+  },
   automation: {
     running: false,
     cycleSeconds: 21600, // 6h default
@@ -30,7 +39,7 @@ const defaultData = {
     totalPosts: 0,
     supraEarned: 0,
   },
-  posts: [], // { id, text, scores, time, auto, posted }
+  posts: [], // { id, text, scores, time, auto, posted, channelResults }
 };
 
 /**
@@ -63,15 +72,45 @@ class JsonDB {
 
 const db = new JsonDB(file, defaultData);
 
+/**
+ * Merges saved data on top of fresh defaults, one level deep, so that
+ * new top-level keys (e.g. a config block for a brand new channel)
+ * automatically appear for users with an older db.json — without
+ * clobbering values the user already configured for existing ones.
+ */
+function mergeDefaults(saved) {
+  const merged = { ...JSON.parse(JSON.stringify(defaultData)), ...saved };
+  merged.channels = { ...JSON.parse(JSON.stringify(defaultData.channels)), ...(saved.channels || {}) };
+  for (const channelId of Object.keys(defaultData.channels)) {
+    merged.channels[channelId] = { ...defaultData.channels[channelId], ...(saved.channels?.[channelId] || {}) };
+  }
+  return merged;
+}
+
+/**
+ * One-time convenience: if the classic .env Telegram credentials are
+ * present and the dashboard hasn't been configured yet, seed the
+ * Telegram channel from them so existing setups keep working with
+ * zero migration steps.
+ */
+function seedFromEnv(data) {
+  const t = data.channels.telegram;
+  if (process.env.TELEGRAM_BOT_TOKEN && !t.botToken) {
+    t.botToken = process.env.TELEGRAM_BOT_TOKEN;
+    t.chatId = process.env.TELEGRAM_CHAT_ID || t.chatId;
+    t.enabled = true;
+  }
+  return data;
+}
+
 async function initDB() {
   fs.mkdirSync(dataDir, { recursive: true });
   if (!fs.existsSync(file)) {
-    db.data = JSON.parse(JSON.stringify(defaultData));
+    db.data = seedFromEnv(JSON.parse(JSON.stringify(defaultData)));
     await db.write();
   } else {
     await db.read();
-    // ensure any newly-added default keys exist on older saved files
-    db.data = { ...JSON.parse(JSON.stringify(defaultData)), ...db.data };
+    db.data = seedFromEnv(mergeDefaults(db.data));
     await db.write();
   }
   return db;
