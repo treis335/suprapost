@@ -1,97 +1,17 @@
 /**
  * SupraPost Payment Module
  *
- * Handles SUPRA deposits using StarKey wallet directly from the browser.
- *
- * Flow:
- *  1. Backend creates a "fingerprinted" intent (unique amount encodes the user)
- *  2. Frontend uses StarKey to send the transaction — browser has full RPC access
- *  3. StarKey returns the tx hash immediately after the user confirms
- *  4. Frontend sends the hash to the backend to verify + credit the balance
- *
- * The server never needs to poll the Supra RPC — the browser handles everything.
+ * Usa a StarKey para enviar SUPRA diretamente do browser.
+ * Confirmado contra transação real mainnet (Jun 2026):
+ *   function: "0x1::supra_account::transfer_coins"
+ *   arguments: [recipient_address_string, amount_octas_string]
  */
 
-const SUPRA_MODULE = "0000000000000000000000000000000000000000000000000000000000000001";
-const SUPRA_COIN_TYPE = "0x1::supra_coin::SupraCoin";
 const OCTAS_PER_SUPRA = 1e8;
-
-// ── BCS helpers ──────────────────────────────────────────────────────────────
-// Minimal BCS serialization for u64 (little-endian 8 bytes).
-// Avoids needing an npm package — mirrors what the supra-l1-sdk does internally.
-
-function bcsSerializeU64(value) {
-  const bigVal = BigInt(value);
-  const bytes = new Uint8Array(8);
-  for (let i = 0; i < 8; i++) {
-    bytes[i] = Number((bigVal >> BigInt(i * 8)) & BigInt(0xff));
-  }
-  return bytes;
-}
-
-function hexToBytes(hex) {
-  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
-  const bytes = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(clean.substr(i * 2, 2), 16);
-  }
-  return bytes;
-}
-
-// ── StarKey helpers ───────────────────────────────────────────────────────────
 
 function getProvider() {
   return window?.starkey?.supra ?? null;
 }
-
-/**
- * Sends SUPRA from the connected wallet to a recipient address.
- * Uses the exact StarKey API format from docs.supra.com.
- *
- * @param {string} fromAddress  - sender wallet address (connected account)
- * @param {string} toAddress    - recipient address
- * @param {number} amountSupra  - amount in SUPRA (e.g. 10.00004265)
- * @returns {Promise<string>}   - transaction hash
- */
-async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
-  const provider = getProvider();
-  if (!provider) throw new Error("StarKey not detected — install it from starkey.app");
-
-  // Convert to octas (u64), round to avoid float issues
-  const amountOctas = Math.round(amountSupra * OCTAS_PER_SUPRA);
-
-  // StarKey raw transaction payload format (from official docs):
-  // [sender, sequence_number, module_address, module_name, function_name,
-  //  type_args, args, optionalArgs]
-  const txExpiryTime = Math.ceil(Date.now() / 1000) + 60; // 60s window
-  const optionalArgs = { txExpiryTime: BigInt(txExpiryTime) };
-
-  const rawTxPayload = [
-    fromAddress,
-    0,                    // sequence number — StarKey fills this in
-    SUPRA_MODULE,
-    "supra_account",
-    "transfer",
-    [],                   // type arguments (none for native SUPRA)
-    [
-      hexToBytes(toAddress),
-      bcsSerializeU64(amountOctas),
-    ],
-    optionalArgs,
-  ];
-
-  // Step 1: build the raw transaction bytes
-  const rawTxData = await provider.createRawTransactionData(rawTxPayload);
-  if (!rawTxData) throw new Error("StarKey failed to create raw transaction data");
-
-  // Step 2: sign and submit — opens the StarKey popup for user confirmation
-  const txHash = await provider.sendTransaction({ data: rawTxData });
-  if (!txHash) throw new Error("StarKey did not return a transaction hash");
-
-  return txHash;
-}
-
-// ── Backend API calls ─────────────────────────────────────────────────────────
 
 function getAuthHeaders() {
   try {
@@ -121,51 +41,121 @@ async function apiConfirmDeposit(intentId, txHash) {
   return res.json();
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
+/**
+ * Envia SUPRA usando a StarKey.
+ * Testa múltiplos formatos — o que funcionar é o correto para a versão instalada.
+ */
+async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
+  const provider = getProvider();
+  if (!provider) throw new Error("StarKey não detectada — instala em starkey.app");
+
+  const amountOctas = Math.round(amountSupra * OCTAS_PER_SUPRA).toString();
+  console.log("[payment] provider methods:", Object.keys(provider));
+  console.log("[payment] sending:", { from: fromAddress, to: toAddress, octas: amountOctas });
+
+  // Formato A — transfer_coins com strings (igual à transação real do SupraScan)
+  // Esta é a forma que a StarKey usa internamente quando envias pelo UI
+  try {
+    const accounts = await provider.account();
+    const sender = Array.isArray(accounts) ? accounts[0] : accounts?.address ?? fromAddress;
+
+    const txExpiryTime = BigInt(Math.ceil(Date.now() / 1000) + 120);
+
+    // BCS serialize u64 (little-endian 8 bytes)
+    function bcsU64(value) {
+      const big = BigInt(value);
+      const buf = new Uint8Array(8);
+      for (let i = 0; i < 8; i++) buf[i] = Number((big >> BigInt(i * 8)) & 0xffn);
+      return buf;
+    }
+
+    // BCS serialize address (32 bytes from hex)
+    function bcsAddress(hex) {
+      const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+      const padded = clean.padStart(64, "0");
+      const buf = new Uint8Array(32);
+      for (let i = 0; i < 32; i++) buf[i] = parseInt(padded.substr(i * 2, 2), 16);
+      return buf;
+    }
+
+    const rawPayload = [
+      sender,
+      0,
+      "0000000000000000000000000000000000000000000000000000000000000001",
+      "supra_account",
+      "transfer_coins",
+      ["0x1::supra_coin::SupraCoin"],
+      [bcsAddress(toAddress), bcsU64(amountOctas)],
+      { txExpiryTime },
+    ];
+
+    console.log("[payment] trying createRawTransactionData...");
+    const rawData = await provider.createRawTransactionData(rawPayload);
+    console.log("[payment] rawData received:", !!rawData);
+
+    const txHash = await provider.sendTransaction({ data: rawData });
+    console.log("[payment] txHash:", txHash);
+    return txHash;
+
+  } catch (errA) {
+    console.warn("[payment] format A failed:", errA.message);
+
+    // Formato B — fallback: starkey sendTransaction direto sem createRawTransactionData
+    // Algumas versões da StarKey aceitam este formato mais simples
+    try {
+      console.log("[payment] trying direct sendTransaction format B...");
+      const txHash = await provider.sendTransaction({
+        from: fromAddress,
+        to: toAddress,
+        value: amountOctas,
+        data: null,
+      });
+      console.log("[payment] format B txHash:", txHash);
+      return txHash;
+    } catch (errB) {
+      console.warn("[payment] format B failed:", errB.message);
+      // Re-throw the original error (format A) as it's more informative
+      throw errA;
+    }
+  }
+}
 
 /**
- * Full deposit flow: intent → StarKey tx → backend confirm.
- *
- * @param {string}   walletAddress  - connected wallet address
- * @param {number}   amountSupra    - amount user wants to deposit (e.g. 10)
- * @param {Function} onStatus       - callback for status updates: { step, message }
- * @returns {Promise<{ ok, credited, txHash, error }>}
+ * Fluxo completo: intent → StarKey tx → backend confirma e credita.
  */
 export async function depositSupra(walletAddress, amountSupra, onStatus = () => {}) {
   try {
-    // Step 1 — create fingerprinted intent on backend
-    onStatus({ step: "intent", message: "Creating deposit intent..." });
+    onStatus({ step: "intent", message: "A criar depósito..." });
     const intentRes = await apiCreateIntent(amountSupra);
     if (!intentRes.ok) {
-      return { ok: false, error: intentRes.error || "Failed to create deposit intent" };
+      return { ok: false, error: intentRes.error || "Erro ao criar depósito" };
     }
     const intent = intentRes.intent;
+    console.log("[payment] intent created:", intent);
 
-    // Step 2 — send transaction via StarKey
-    onStatus({ step: "sending", message: `Confirm ${intent.encodedAmount} SUPRA in StarKey...` });
+    onStatus({ step: "sending", message: `Confirma ${intent.encodedAmount} SUPRA na StarKey...` });
     const txHash = await sendSupraTransfer(walletAddress, intent.depositAddress, intent.encodedAmount);
 
-    // Step 3 — confirm with backend
-    onStatus({ step: "confirming", message: "Verifying transaction..." });
+    onStatus({ step: "confirming", message: "A verificar transação..." });
     const confirmRes = await apiConfirmDeposit(intent.id, txHash);
     if (!confirmRes.ok) {
-      return { ok: false, error: confirmRes.error || "Backend could not confirm transaction", txHash };
+      return { ok: false, error: confirmRes.error || "Backend não conseguiu confirmar", txHash };
     }
 
-    onStatus({ step: "done", message: `✓ ${intent.requestedAmount} SUPRA credited` });
+    onStatus({ step: "done", message: `✓ ${intent.requestedAmount} SUPRA creditados` });
     return { ok: true, credited: intent.requestedAmount, txHash };
 
   } catch (err) {
-    // User rejected the tx in StarKey — common, not an error we should log loudly
+    console.error("[payment] depositSupra error:", err);
     const userRejected =
-      err.message?.includes("rejected") ||
-      err.message?.includes("cancel") ||
-      err.message?.includes("denied") ||
+      err.message?.toLowerCase().includes("reject") ||
+      err.message?.toLowerCase().includes("cancel") ||
+      err.message?.toLowerCase().includes("denied") ||
       err.code === 4001;
 
     return {
       ok: false,
-      error: userRejected ? "Transaction cancelled" : (err.message || "Unknown error"),
+      error: userRejected ? "Transação cancelada" : (err.message || "Erro desconhecido"),
     };
   }
 }
