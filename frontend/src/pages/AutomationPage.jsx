@@ -12,7 +12,7 @@ export function AutomationPage({
       {!isMobile && (
         <div>
           <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Automation</div>
-          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>The server posts on its own, even with the browser closed.</div>
+          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>Posts automatically to all enabled channels on your schedule.</div>
         </div>
       )}
 
@@ -45,7 +45,7 @@ export function AutomationPage({
         <StatTile label="Generated" value={stats.totalGenerations} color={C.accent2} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
         <Card eyebrow="Schedule" title="Cycle Settings">
           <Select
             value={automation.cycleSeconds}
@@ -70,7 +70,7 @@ export function AutomationPage({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 15px", marginTop: 10 }}>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 600 }}>🖼 Generate image per post</div>
-              <div style={{ fontSize: "0.68rem", color: C.muted, marginTop: 3 }}>AI creates a visual for every automated post (needs TOGETHER_API_KEY)</div>
+              <div style={{ fontSize: "0.68rem", color: C.muted, marginTop: 3 }}>AI creates a visual for every automated post</div>
             </div>
             <Switch checked={!!automation.withImage} onChange={(v) => saveAutomationSettings({ withImage: v })} />
           </div>
@@ -83,11 +83,7 @@ export function AutomationPage({
           )}
         </Card>
 
-        <Card eyebrow="How It Works" title="The Server Takes Over">
-          <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.75 }}>
-            Once you start automation, the backend generates, charges SUPRA, and publishes to every enabled channel on its own, on the cycle you set. You don't need to keep this page open — only the server (<code style={{ background: C.bg, padding: "2px 7px", borderRadius: 5, fontFamily: C.mono, fontSize: "0.76rem" }}>npm start</code>) needs to be running.
-          </div>
-        </Card>
+
       </div>
     </div>
   );

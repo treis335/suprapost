@@ -7,15 +7,15 @@ export function SetupPage({ isMobile, backendOk, wallet, topUp, settings, update
       {!isMobile && (
         <div>
           <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Setup</div>
-          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>Saved on the server — applies to all automation.</div>
+          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>Configure your content profile and publishing preferences.</div>
         </div>
       )}
 
-      <Card eyebrow="Status" title="Backend Connection" right={<ConnStatus ok={backendOk} />}>
+      <Card eyebrow="Status" title="Connection" right={<ConnStatus ok={backendOk} />}>
         <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6 }}>
           {backendOk
-            ? "Server is running — settings and history stay saved even if you close this page."
-            : "No connection to the backend. Make sure the server is running (npm start in the backend folder)."}
+            ? "Connected — all your settings are saved automatically."
+            : "Not connected. Please make sure the SupraPost server is running."}
         </div>
       </Card>
 
@@ -50,11 +50,7 @@ export function SetupPage({ isMobile, backendOk, wallet, topUp, settings, update
         <Btn variant="primary" onClick={saveSettings}>Save profile</Btn>
       </Card>
 
-      <Card eyebrow="Next Steps" title="API Configuration">
-        <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.7 }}>
-          The DeepSeek key is configured in the backend's <code style={{ background: C.bg, padding: "2px 7px", borderRadius: 5, fontFamily: C.mono, fontSize: "0.78rem" }}>.env</code> file, never here, for security. Social network credentials (Telegram, Discord, X, Instagram) are managed from the <strong>Channels</strong> tab instead — no redeploy needed when you add or rotate a token.
-        </div>
-      </Card>
+
     </div>
   );
 }
