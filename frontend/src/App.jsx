@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "./theme";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 import { ComposePage } from "./pages/ComposePage";
+import { depositSupra } from "./payment";
 
 /* ============================================================
    DESIGN SYSTEM — "Pulse" v2
@@ -66,23 +67,7 @@ const api = {
   },
 };
 
-async function createDepositIntent(amount) {
-  const res = await fetch("/api/wallet/deposit/intent", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ amount }),
-  });
-  return res.json();
-}
-
-async function confirmDepositByHash(intentId, txHash) {
-  const res = await fetch("/api/wallet/deposit/confirm", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ intentId, txHash }),
-  });
-  return res.json();
-}
+// Deposit API is handled by frontend/src/payment.js
 
 /* ============================================================
    RESPONSIVE — 3 tiers: mobile (<700), tablet (700-1080), desktop (1080+)
@@ -483,102 +468,30 @@ function ChannelRow({ id, channel, onToggle, onSaveCredentials }) {
 }
 
 /* ============================================================
-   TOP UP FLOW — non-custodial deposit.
-   1. User picks amount -> backend creates a fingerprinted intent
-   2. Frontend uses StarKey to send the exact amount directly
-   3. StarKey returns the tx hash -> we send hash to backend to confirm
-   No polling, no RPC access needed from the server side.
+   TOP UP FLOW — uses payment.js which handles StarKey directly.
 ============================================================ */
-function TopUpFlow({ onCredited }) {
-  const [step, setStep] = useState("pick"); // pick | sending | confirming | confirmed
+function TopUpFlow({ walletAddress, onCredited }) {
   const [amount, setAmount] = useState(10);
-  const [intent, setIntent] = useState(null);
+  const [status, setStatus] = useState(null); // null | { step, message }
   const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
 
-  async function startDeposit() {
+  async function handleDeposit() {
     setError("");
-
-    // Step 1: create intent (get fingerprinted amount + deposit address)
-    const res = await createDepositIntent(Number(amount));
-    if (!res.ok) { setError(res.error || "Could not create deposit intent"); return; }
-    const depositIntent = res.intent;
-    setIntent(depositIntent);
-    setStep("sending");
-
-    // Step 2: use StarKey to send the transaction directly from the browser
-    try {
-      const provider = window?.starkey?.supra;
-      if (!provider) throw new Error("StarKey not detected — please install it");
-
-      // Convert SUPRA to octas (8 decimal places)
-      const amountOctas = Math.round(depositIntent.encodedAmount * 1e8).toString();
-
-      const txHash = await provider.sendTransaction({
-        data: {
-          function: "0x1::supra_account::transfer_coins",
-          type_arguments: ["0x1::supra_coin::SupraCoin"],
-          arguments: [depositIntent.depositAddress, amountOctas],
-        },
-      });
-
-      if (!txHash) throw new Error("Wallet did not return a transaction hash");
-
-      setStep("confirming");
-
-      // Step 3: send hash to backend to verify and credit
-      const confirm = await confirmDepositByHash(depositIntent.id, txHash);
-      if (!confirm.ok) throw new Error(confirm.error || "Backend could not confirm the transaction");
-
-      setStep("confirmed");
+    setDone(false);
+    const result = await depositSupra(walletAddress, Number(amount), setStatus);
+    setStatus(null);
+    if (result.ok) {
+      setDone(true);
       onCredited?.();
-    } catch (err) {
-      setError(err.message || "Transaction failed");
-      setStep("pick");
+    } else {
+      setError(result.error || "Deposit failed");
     }
   }
 
-  function reset() {
-    setStep("pick"); setIntent(null); setError("");
-  }
+  function reset() { setDone(false); setError(""); setStatus(null); }
 
-  if (step === "pick") {
-    return (
-      <div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          <Input type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ flex: 1 }} />
-          <Btn variant="supra" onClick={startDeposit}>Deposit</Btn>
-        </div>
-        {error && <div style={{ fontSize: "0.74rem", color: C.danger, marginTop: 6 }}>{error}</div>}
-      </div>
-    );
-  }
-
-  if (step === "sending") {
-    return (
-      <div className="fade-up">
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.78rem", color: C.text2 }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.accent, animation: "softPulse 1.2s ease-in-out infinite", display: "inline-block" }} />
-          Confirm the transaction in StarKey...
-        </div>
-        <div style={{ fontSize: "0.72rem", color: C.muted, marginTop: 8 }}>
-          Sending {intent?.encodedAmount} SUPRA to the deposit address
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "confirming") {
-    return (
-      <div className="fade-up">
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.78rem", color: C.text2 }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.accent, animation: "softPulse 1.2s ease-in-out infinite", display: "inline-block" }} />
-          Verifying transaction on-chain...
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "confirmed") {
+  if (done) {
     return (
       <div className="scale-in">
         <div style={{ fontSize: "0.84rem", color: C.supra, fontWeight: 600, marginBottom: 10 }}>✓ Deposit confirmed and credited</div>
@@ -587,7 +500,28 @@ function TopUpFlow({ onCredited }) {
     );
   }
 
-  return null;
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <Input
+          type="number" min="1" value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          style={{ flex: 1 }}
+          disabled={!!status}
+        />
+        <Btn variant="supra" onClick={handleDeposit} disabled={!!status}>
+          {status ? "..." : "Deposit"}
+        </Btn>
+      </div>
+      {status && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.76rem", color: C.text2 }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.accent, animation: "softPulse 1.2s ease-in-out infinite", display: "inline-block", flexShrink: 0 }} />
+          {status.message}
+        </div>
+      )}
+      {error && <div style={{ fontSize: "0.74rem", color: C.danger, marginTop: 6 }}>{error}</div>}
+    </div>
+  );
 }
 
 /* ============================================================
@@ -889,7 +823,7 @@ export default function App() {
         <div style={{ height: 1, background: C.border, marginBottom: 16 }} />
 
         <div style={{ fontSize: "0.78rem", fontWeight: 600, marginBottom: 10 }}>Deposit SUPRA</div>
-        <TopUpFlow onCredited={refreshAll} />
+        <TopUpFlow walletAddress={session?.address} onCredited={refreshAll} />
 
         <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 14, lineHeight: 1.6 }}>
           Deposits are non-custodial — you sign the transfer from your own
