@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "./theme";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 import { ComposePage } from "./pages/ComposePage";
-import { DepositPage } from "./pages/DepositPage";
 import { depositSupra } from "./payment";
+import { DepositModal } from "./components/ui/DepositModal";
 
 /* ============================================================
    DESIGN SYSTEM — "Pulse" v2
@@ -17,12 +17,11 @@ import { depositSupra } from "./payment";
    throughout (hover depth, focus rings, spacing rhythm).
 ============================================================ */
 const TABS = [
-  { id: "setup", icon: "⚙", label: "Setup" },
-  { id: "channels", icon: "📡", label: "Channels" },
-  { id: "compose",  icon: "✦", label: "Compose" },
+  { id: "setup",      icon: "⚙",  label: "Setup" },
+  { id: "channels",   icon: "📡", label: "Channels" },
+  { id: "compose",    icon: "✦",  label: "Compose" },
   { id: "automation", icon: "⚡", label: "Automation" },
-  { id: "history", icon: "📋", label: "History" },
-  { id: "deposit", icon: "⬡", label: "Deposit" },
+  { id: "history",    icon: "📋", label: "History" },
 ];
 
 const fmt = (n) => Number(n ?? 0).toFixed(2);
@@ -359,6 +358,7 @@ export default function App() {
   const { isMobile, isTablet, isDesktop } = useViewport();
   const isCompact = isMobile || isTablet; // shared layout rules for <1080
   const [tab, setTab] = useState("setup");
+  const [depositOpen, setDepositOpen] = useState(false);
   const [backendOk, setBackendOk] = useState(true);
 
   const [session, setSession] = useState(() => getSession());
@@ -539,11 +539,7 @@ export default function App() {
         </div>
       </Card>
 
-      <Card eyebrow="Status" title="Connection" right={<ConnStatus ok={backendOk} />}>
-        <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6 }}>
-          {backendOk ? "Connected — all your settings are saved." : "Not connected. Please make sure the SupraPost server is running."}
-        </div>
-      </Card>
+
 
       <Card eyebrow="Payments" title="SUPRA Balance" accentTop={C.supra}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
@@ -551,7 +547,7 @@ export default function App() {
             <div style={{ fontFamily: C.mono, fontSize: "1.7rem", color: C.supra, fontWeight: 600 }}>{fmt(wallet.balance)} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span></div>
             <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 4 }}>Cost per post: {fmt(wallet.costPerPost)} SUPRA</div>
           </div>
-          <Btn variant="supra" onClick={() => setTab("deposit")}>+ Deposit SUPRA</Btn>
+          <Btn variant="supra" onClick={() => setDepositOpen(true)}>+ Deposit SUPRA</Btn>
         </div>
       </Card>
 
@@ -797,7 +793,7 @@ export default function App() {
         <div>
           <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Channels</div>
           <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 4 }}>
-            Connect your social networks and enable the ones you want to publish to.
+            Connect your social networks and choose where to publish.
           </div>
         </div>
       )}
@@ -941,16 +937,7 @@ export default function App() {
     </div>
   );
 
-  const Deposit = (
-    <DepositPage
-      isMobile={isMobile}
-      wallet={wallet}
-      walletAddress={session?.address}
-      onCredited={refreshAll}
-    />
-  );
-
-  const panels = { setup: Setup, channels: Channels, compose: Generate, automation: Automation, history: History, deposit: Deposit };
+  const panels = { setup: Setup, channels: Channels, compose: Generate, automation: Automation, history: History };
 
   /* ============================================================
      AUTH GATE — show the wallet sign-in screen until we have a session
@@ -978,6 +965,8 @@ export default function App() {
         <div key={tab} className="fade-up" style={{ flex: 1, padding: "18px 16px 96px", overflowY: "auto" }}>
           {panels[tab]}
         </div>
+
+        {depositOpen && <DepositModal wallet={wallet} walletAddress={session?.address} onCredited={refreshAll} onClose={() => setDepositOpen(false)} />}
 
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(16,14,26,0.9)", backdropFilter: "blur(12px)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
           {TABS.map(({ id, icon, label }) => (
@@ -1028,6 +1017,7 @@ export default function App() {
           {panels[tab]}
         </div>
       </div>
+      {depositOpen && <DepositModal wallet={wallet} walletAddress={session?.address} onCredited={refreshAll} onClose={() => setDepositOpen(false)} />}
     );
   }
 
@@ -1068,7 +1058,7 @@ export default function App() {
             <div style={{ fontSize: "0.64rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Balance</div>
             <div style={{ fontFamily: C.mono, fontSize: "1.5rem", color: C.supra, fontWeight: 600, marginTop: 5 }}>{fmt(wallet.balance)}</div>
             <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 3 }}>SUPRA tokens</div>
-            <Btn full variant="supra" size="sm" style={{ marginTop: 12 }} onClick={() => setTab("deposit")}>Deposit SUPRA</Btn>
+            <Btn full variant="supra" size="sm" style={{ marginTop: 12 }} onClick={() => setDepositOpen(true)}>Deposit SUPRA</Btn>
           </Card>
 
           <div style={{ fontSize: "0.62rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.15em", padding: "18px 14px 9px" }}>Channels</div>
@@ -1112,6 +1102,7 @@ export default function App() {
           )}
         </div>
       </div>
+      {depositOpen && <DepositModal wallet={wallet} walletAddress={session?.address} onCredited={refreshAll} onClose={() => setDepositOpen(false)} />}
     </div>
   );
 }
