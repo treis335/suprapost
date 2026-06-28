@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require("uuid");
-const { getAccountTransactions, OCTAS_PER_SUPRA } = require("./supraClient");
+const { getAccountTransactions, extractTransferInfo, OCTAS_PER_SUPRA } = require("./supraClient");
 
 /**
  * Non-custodial top-up flow:
@@ -118,15 +118,18 @@ async function pollForDeposits(db) {
   const fulfilled = [];
 
   for (const tx of transactions) {
-    // Match by amount against any pending intent's encoded amount.
-    // amountInSupra extraction depends on the real payload shape — see
-    // supraClient.js NOTE. This assumes a helper resolves it; replace
-    // with confirmed parsing once tested against testnet.
-    const amountOctas = tx?.payload?.amount ?? tx?.output?.amount; // best-effort, confirm against real data
-    if (amountOctas == null) continue;
-    const amountSupra = +(Number(amountOctas) / OCTAS_PER_SUPRA).toFixed(8);
+    // Parse using the confirmed mainnet transaction format
+    const info = extractTransferInfo(tx);
+    if (!info) continue;
 
+    // Only process transfers TO our deposit address
+    const recipientClean = (info.recipient || "").toLowerCase().replace(/^0x/, "");
+    const depositClean = DEPOSIT_ADDRESS.toLowerCase().replace(/^0x/, "");
+    if (!recipientClean.endsWith(depositClean) && !depositClean.endsWith(recipientClean)) continue;
+
+    const amountSupra = +(Number(info.amountOctas) / OCTAS_PER_SUPRA).toFixed(8);
     const key = amountSupra.toFixed(8);
+
     const intent = pendingIntents.get(key);
     if (!intent || intent.fulfilled) continue;
 

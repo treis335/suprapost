@@ -52,16 +52,39 @@ async function getAccountTransactions(address, { count = 25 } = {}) {
 }
 
 /**
- * Best-effort parser for a transfer transaction payload.
- * Adjust path once inspected against real testnet transactions.
+ * Extracts the transferred amount (in octas) from a real Supra transaction.
+ *
+ * Confirmed against mainnet transaction format (Jun 2026):
+ *   payload.Move.function  = "0x1::supra_account::transfer_coins"
+ *   payload.Move.arguments = ["<recipient_address>", "<amount_in_octas>"]
+ *
+ * The amount also appears in output.Move.events as fungible_asset::Deposit
+ * but reading from arguments is simpler and equally reliable.
  */
 function extractTransferInfo(tx) {
   try {
-    const payload = tx?.payload?.Move?.EntryFunction || tx?.payload?.EntryFunction;
+    const move = tx?.payload?.Move;
+    if (!move) return null;
+
+    // Match the confirmed function name from mainnet
+    const fn = move.function || "";
     const isTransfer =
-      payload?.module?.name === "supra_account" && payload?.function === "transfer";
+      fn === "0x1::supra_account::transfer_coins" ||
+      fn === "0x1::supra_account::transfer";
     if (!isTransfer) return null;
-    return { hash: tx.hash, sender: tx.header?.sender, raw: tx };
+
+    // arguments[0] = recipient address, arguments[1] = amount in octas
+    const args = move.arguments || [];
+    const recipient = args[0];
+    const amountOctas = args[1] != null ? BigInt(args[1]) : null;
+    if (amountOctas === null) return null;
+
+    return {
+      hash: tx.hash,
+      sender: tx.header?.sender,
+      recipient,
+      amountOctas,
+    };
   } catch {
     return null;
   }
