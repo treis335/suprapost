@@ -75,8 +75,12 @@ async function createDepositIntent(amount) {
   return res.json();
 }
 
-async function getDepositIntentStatus(id) {
-  const res = await fetch(`/api/wallet/deposit/intent/${id}`, { headers: { ...authHeaders() } });
+async function confirmDepositByHash(intentId, txHash) {
+  const res = await fetch("/api/wallet/deposit/confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ intentId, txHash }),
+  });
   return res.json();
 }
 
@@ -480,37 +484,60 @@ function ChannelRow({ id, channel, onToggle, onSaveCredentials }) {
 
 /* ============================================================
    TOP UP FLOW — non-custodial deposit.
-   User picks an amount -> we get back a precise amount + our deposit
-   address -> user sends that EXACT amount from their own wallet ->
-   we poll until the backend confirms it saw the transaction on-chain.
+   1. User picks amount -> backend creates a fingerprinted intent
+   2. Frontend uses StarKey to send the exact amount directly
+   3. StarKey returns the tx hash -> we send hash to backend to confirm
+   No polling, no RPC access needed from the server side.
 ============================================================ */
 function TopUpFlow({ onCredited }) {
-  const [step, setStep] = useState("pick"); // pick | waiting | confirmed | error
+  const [step, setStep] = useState("pick"); // pick | sending | confirming | confirmed
   const [amount, setAmount] = useState(10);
   const [intent, setIntent] = useState(null);
   const [error, setError] = useState("");
-  const pollRef = useRef(null);
 
   async function startDeposit() {
     setError("");
+
+    // Step 1: create intent (get fingerprinted amount + deposit address)
     const res = await createDepositIntent(Number(amount));
-    if (!res.ok) { setError(res.error || "Could not create deposit"); return; }
-    setIntent(res.intent);
-    setStep("waiting");
-    pollRef.current = setInterval(async () => {
-      const status = await getDepositIntentStatus(res.intent.id);
-      if (status.ok && status.intent.fulfilled) {
-        clearInterval(pollRef.current);
-        setStep("confirmed");
-        onCredited?.();
-      }
-    }, 4000);
+    if (!res.ok) { setError(res.error || "Could not create deposit intent"); return; }
+    const depositIntent = res.intent;
+    setIntent(depositIntent);
+    setStep("sending");
+
+    // Step 2: use StarKey to send the transaction directly from the browser
+    try {
+      const provider = window?.starkey?.supra;
+      if (!provider) throw new Error("StarKey not detected — please install it");
+
+      // Convert SUPRA to octas (8 decimal places)
+      const amountOctas = Math.round(depositIntent.encodedAmount * 1e8).toString();
+
+      const txHash = await provider.sendTransaction({
+        data: {
+          function: "0x1::supra_account::transfer_coins",
+          type_arguments: ["0x1::supra_coin::SupraCoin"],
+          arguments: [depositIntent.depositAddress, amountOctas],
+        },
+      });
+
+      if (!txHash) throw new Error("Wallet did not return a transaction hash");
+
+      setStep("confirming");
+
+      // Step 3: send hash to backend to verify and credit
+      const confirm = await confirmDepositByHash(depositIntent.id, txHash);
+      if (!confirm.ok) throw new Error(confirm.error || "Backend could not confirm the transaction");
+
+      setStep("confirmed");
+      onCredited?.();
+    } catch (err) {
+      setError(err.message || "Transaction failed");
+      setStep("pick");
+    }
   }
 
-  useEffect(() => () => clearInterval(pollRef.current), []);
-
   function reset() {
-    clearInterval(pollRef.current);
     setStep("pick"); setIntent(null); setError("");
   }
 
@@ -521,25 +548,32 @@ function TopUpFlow({ onCredited }) {
           <Input type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ flex: 1 }} />
           <Btn variant="supra" onClick={startDeposit}>Deposit</Btn>
         </div>
-        {error && <div style={{ fontSize: "0.74rem", color: C.danger }}>{error}</div>}
+        {error && <div style={{ fontSize: "0.74rem", color: C.danger, marginTop: 6 }}>{error}</div>}
       </div>
     );
   }
 
-  if (step === "waiting") {
+  if (step === "sending") {
     return (
       <div className="fade-up">
-        <div style={{ fontSize: "0.78rem", color: C.text2, marginBottom: 10, lineHeight: 1.6 }}>
-          Send <b style={{ color: C.supra, fontFamily: C.mono }}>{intent.encodedAmount}</b> SUPRA (exact amount — this includes a unique fingerprint, don't round it) from your wallet to:
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.78rem", color: C.text2 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.accent, animation: "softPulse 1.2s ease-in-out infinite", display: "inline-block" }} />
+          Confirm the transaction in StarKey...
         </div>
-        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", fontFamily: C.mono, fontSize: "0.76rem", wordBreak: "break-all", marginBottom: 12 }}>
-          {intent.depositAddress}
+        <div style={{ fontSize: "0.72rem", color: C.muted, marginTop: 8 }}>
+          Sending {intent?.encodedAmount} SUPRA to the deposit address
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.76rem", color: C.muted }}>
-          <span className="spinner-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: C.accent, animation: "softPulse 1.2s ease-in-out infinite" }} />
-          Watching the chain for your transaction...
+      </div>
+    );
+  }
+
+  if (step === "confirming") {
+    return (
+      <div className="fade-up">
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.78rem", color: C.text2 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.accent, animation: "softPulse 1.2s ease-in-out infinite", display: "inline-block" }} />
+          Verifying transaction on-chain...
         </div>
-        <Btn variant="ghost" size="sm" style={{ marginTop: 12 }} onClick={reset}>Cancel</Btn>
       </div>
     );
   }

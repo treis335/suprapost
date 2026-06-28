@@ -9,7 +9,7 @@ const { runGenerationCycle } = require("./engine");
 const { startAutomation, stopAutomation, resumeAllAutomations } = require("./scheduler");
 const { publishToChannels } = require("./channels");
 const { createNonce, verifyAndIssueToken, requireAuth } = require("./auth");
-const { createDepositIntent, getIntentStatus, pollForDeposits } = require("./deposits");
+const { createDepositIntent, getIntentStatus, pollForDeposits, confirmDepositByTxHash } = require("./deposits");
 const { cleanOldImages, IMAGES_DIR } = require("./imageGen");
 
 const PORT = process.env.PORT || 3001;
@@ -189,14 +189,24 @@ async function main() {
     }
   });
 
-  // Step 2: frontend polls this while waiting for the user to complete
-  // the transfer in their wallet, to know when it's been detected and
-  // credited (or to show "still waiting...").
-  app.get("/api/wallet/deposit/intent/:id", requireAuth, async (req, res) => {
-    const intent = getIntentStatus(req.params.id);
+  // Step 2: frontend sends the tx hash after StarKey confirms the transaction.
+  // We fetch the transaction from the chain, verify it, and credit the user.
+  // This avoids the server needing to poll the RPC — the browser already has the hash.
+  app.post("/api/wallet/deposit/confirm", requireAuth, async (req, res) => {
+    const { intentId, txHash } = req.body;
+    if (!intentId || !txHash) return res.status(400).json({ ok: false, error: "Missing intentId or txHash" });
+
+    const intent = getIntentStatus(intentId);
     if (!intent) return res.status(404).json({ ok: false, error: "Unknown or expired deposit intent" });
     if (intent.userAddress !== req.walletAddress) return res.status(403).json({ ok: false, error: "Not your deposit intent" });
-    res.json({ ok: true, intent });
+    if (intent.fulfilled) return res.json({ ok: true, alreadyCredited: true });
+
+    try {
+      const result = await confirmDepositByTxHash(db, intent, txHash);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
   });
 
   // ════════════════════════════════════════════════════════
