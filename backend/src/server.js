@@ -126,27 +126,19 @@ async function main() {
   // WALLET — balance, top-up
   // ════════════════════════════════════════════════════════
 
-  // GET /api/wallet
-  // - ALLOW_SIMULATED_TOPUP=true  → return stored (simulated) balance
-  // - otherwise                   → fetch real on-chain balance, store it, return it
+  // GET /api/wallet — devolve o saldo interno da plataforma (créditos).
+  //
+  // IMPORTANTE: o saldo interno é SEPARADO do saldo on-chain do utilizador.
+  // Quando um utilizador faz depósito, envia SUPRA para o endereço da plataforma
+  // e nós creditamos o equivalente no saldo interno. O saldo on-chain do utilizador
+  // não é o nosso saldo — não faz sentido lê-lo aqui.
+  //
+  // ALLOW_SIMULATED_TOPUP=true → modo dev, saldo interno livre
+  // caso contrário              → saldo interno real (creditado via depósitos)
   app.get("/api/wallet", requireAuth, async (req, res) => {
     await db.read();
     const user = db.forUser(req.walletAddress);
-
-    if (process.env.ALLOW_SIMULATED_TOPUP !== "true") {
-      // Real mode: read balance directly from the Supra blockchain
-      try {
-        const { getBalance } = require("./supraClient");
-        const onChain = await getBalance(req.walletAddress);
-        // truncate to 10 decimal places — chain returns up to 8 (octa precision)
-        user.wallet.balance = +onChain.toFixed(8);
-        await db.write();
-      } catch (err) {
-        console.error("[wallet] Failed to fetch on-chain balance:", err.message);
-        // fall through — return last-known cached balance rather than erroring
-      }
-    }
-
+    // Devolve directamente o saldo interno — nunca sobrescreve com saldo on-chain
     res.json(user.wallet);
   });
 

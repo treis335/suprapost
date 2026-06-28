@@ -47,7 +47,7 @@ function freshUserData() {
       imageCustomPrompt: "",
     },
     wallet: {
-      balance: 50, // only used when ALLOW_SIMULATED_TOPUP=true; otherwise overwritten by on-chain balance
+      balance: 0,
       costPerPost: 1,
     },
     stats: {
