@@ -1015,122 +1015,194 @@ export default function App() {
     ], helpUrl: "https://developers.facebook.com/docs/instagram-platform" },
   };
 
-  const ChannelsPanel = () => {
-    const [expanding, setExpanding] = React.useState(null);
-    const [creds, setCreds] = React.useState({});
-    const [testResults, setTestResults] = React.useState({});
+  // Each channel card owns its own open/creds/test state — no shared
+  // "expanding" variable that causes the collapse bug.
+  function SingleChannelCard({ id }) {
+    const info  = CHANNEL_INFO[id];
+    const state = channels.find((c) => c.id === id) || {};
+    const { configured, enabled } = state;
 
-    const channelIds = Object.keys(CHANNEL_INFO);
+    const [open,       setOpen]       = React.useState(false);
+    const [creds,      setCreds]      = React.useState({});
+    const [saving,     setSaving]     = React.useState(false);
+    const [testing,    setTesting]    = React.useState(false);
+    const [testResult, setTestResult] = React.useState(null);
 
-    async function saveChannel(id) {
-      const info = CHANNEL_INFO[id];
+    const isActive = configured && enabled;
+    const isPaused = configured && !enabled;
+    const statusColor = isActive ? C.supra : isPaused ? C.warn : C.muted;
+    const statusLabel = isActive ? "Active" : isPaused ? "Paused" : "Not connected";
+
+    async function handleSave() {
+      setSaving(true);
       const credentials = {};
-      for (const f of info.fields) credentials[f.key] = creds[id]?.[f.key] || "";
-      const updated = await api.post(`/channels/${id}`, { credentials });
+      for (const f of info.fields) credentials[f.key] = creds[f.key] || "";
+      const updated = await api.post(`/channels/${id}`, { credentials, enabled: true });
       const arr = Array.isArray(updated) ? updated : Object.values(updated || {});
       setChannels(arr);
+      setSaving(false);
+      setOpen(false);
     }
 
-    async function testChannel(id) {
+    async function handleTest() {
+      setTesting(true);
+      setTestResult(null);
       const result = await api.post(`/channels/${id}/test`);
-      setTestResults((prev) => ({ ...prev, [id]: result }));
+      setTestResult(result);
+      setTesting(false);
     }
-
-    const ch = (id) => channels.find((c) => c.id === id) || {};
 
     return (
-      <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {!isMobile && (
-          <div>
-            <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Channels</div>
-            <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 4 }}>Connect your social networks — credentials stay on the server, never in the browser.</div>
+      <Card
+        accentTop={isActive ? info.color : undefined}
+        style={{ display: "flex", flexDirection: "column", gap: 0 }}
+      >
+        {/* ── Header ── */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+              background: `${info.color}18`,
+              border: `1.5px solid ${isActive ? info.color + "55" : info.color + "25"}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "1.25rem",
+              boxShadow: isActive ? `0 0 16px -4px ${info.color}55` : "none",
+              transition: "box-shadow 0.3s",
+            }}>{info.icon}</div>
+            <div>
+              <div style={{ fontWeight: 700, fontFamily: C.display, fontSize: "1rem", letterSpacing: "-0.01em" }}>{info.name}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3 }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                  background: statusColor,
+                  boxShadow: isActive ? `0 0 6px ${statusColor}` : "none",
+                  animation: isActive ? "softPulse 2s ease-in-out infinite" : "none",
+                }} />
+                <span style={{ fontSize: "0.71rem", color: statusColor, fontFamily: C.mono }}>{statusLabel}</span>
+              </div>
+            </div>
           </div>
-        )}
-        <div style={{ display: "grid", gridTemplateColumns: isCompact ? "1fr" : "repeat(2,1fr)", gap: 14 }}>
-          {channelIds.map((id) => {
-            const info = CHANNEL_INFO[id];
-            const state = ch(id);
-            const open = expanding === id;
-            const configured = state.configured;
-            const enabled = state.enabled;
-
-            return (
-              <Card key={id} accentTop={configured && enabled ? info.color : undefined}
-                style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {/* Header row */}
-                <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 9, background: `${info.color}1f`,
-                      border: `1px solid ${info.color}44`, display: "flex", alignItems: "center",
-                      justifyContent: "center", fontSize: "1.1rem", flexShrink: 0 }}>{info.icon}</div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: "0.94rem" }}>{info.name}</div>
-                      <div style={{ fontSize: "0.68rem", color: configured && enabled ? C.supra : configured ? C.warn : C.muted, marginTop: 2 }}>
-                        {configured && enabled ? "● Active" : configured ? "● Configured · paused" : "○ Not configured"}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: "0.74rem", color: C.muted }}>{enabled ? "On" : "Off"}</span>
-                    <button onClick={() => toggleChannel(id, !enabled)} style={{
-                      width: 42, height: 24, borderRadius: 20, border: `1px solid ${enabled ? info.color : C.border}`,
-                      background: enabled ? info.color : C.raised, position: "relative", cursor: "pointer", padding: 0, transition: "all 0.25s",
-                    }}>
-                      <span style={{ position: "absolute", top: 2, left: enabled ? 20 : 2, width: 18, height: 18,
-                        borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Expand/collapse credentials */}
-                <button onClick={() => setExpanding(open ? null : id)}
-                  style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8,
-                    color: C.text2, cursor: "pointer", padding: "8px 12px", fontSize: "0.76rem",
-                    display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span>{configured ? "Update credentials" : "Enter credentials"}</span>
-                  <span style={{ color: C.muted }}>{open ? "▲" : "▼"}</span>
-                </button>
-
-                {open && (
-                  <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {info.fields.map((f) => (
-                      <Field key={f.key} label={f.label}>
-                        <Input
-                          type="password"
-                          placeholder={f.placeholder || ""}
-                          value={creds[id]?.[f.key] || ""}
-                          onChange={(e) => setCreds((prev) => ({ ...prev, [id]: { ...prev[id], [f.key]: e.target.value } }))}
-                        />
-                      </Field>
-                    ))}
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <Btn variant="primary" size="sm" onClick={() => saveChannel(id)}>Save</Btn>
-                      <Btn variant="ghost"   size="sm" onClick={() => testChannel(id)}>Test connection</Btn>
-                      {info.helpUrl && (
-                        <a href={info.helpUrl} target="_blank" rel="noreferrer"
-                          style={{ fontSize: "0.7rem", color: C.muted, marginLeft: "auto", alignSelf: "center" }}>
-                          How to get credentials ↗
-                        </a>
-                      )}
-                    </div>
-                    {testResults[id] && (
-                      <div className="pop-in" style={{ fontSize: "0.74rem", padding: "8px 12px", borderRadius: 8,
-                        background: testResults[id].ok ? `${C.supra}14` : `${C.danger}14`,
-                        border: `1px solid ${testResults[id].ok ? C.supra : C.danger}40`,
-                        color: testResults[id].ok ? C.supra : C.danger }}>
-                        {testResults[id].ok ? "✓ Test message sent successfully." : `✕ ${testResults[id].error || testResults[id].reason || "Failed"}`}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
-          })}
+          {/* Toggle */}
+          <button
+            onClick={() => toggleChannel(id, !enabled)}
+            disabled={!configured}
+            style={{
+              width: 44, height: 25, borderRadius: 20, padding: 0,
+              border: `1.5px solid ${enabled && configured ? info.color : C.border}`,
+              background: enabled && configured ? info.color : C.raised,
+              position: "relative", cursor: configured ? "pointer" : "not-allowed",
+              opacity: configured ? 1 : 0.35, transition: "all 0.25s", flexShrink: 0,
+            }}
+          >
+            <span style={{
+              position: "absolute", top: 2, left: enabled && configured ? 21 : 2,
+              width: 19, height: 19, borderRadius: "50%", background: "#fff",
+              transition: "left 0.22s cubic-bezier(.4,0,.2,1)",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
+            }} />
+          </button>
         </div>
 
-      </div>
+        {/* ── Credentials toggle ── */}
+        {info.fields.length > 0 && (
+          <>
+            <button
+              onClick={() => { setOpen((o) => !o); setTestResult(null); }}
+              style={{
+                all: "unset", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "10px 0",
+                borderTop: `1px solid ${C.border}`,
+                fontSize: "0.75rem", fontWeight: 600,
+                color: open ? C.accent : C.text2,
+                transition: "color 0.2s",
+                userSelect: "none",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: 18, height: 18, borderRadius: 5,
+                  background: open ? `${C.accent}20` : C.raised,
+                  border: `1px solid ${open ? C.accent + "55" : C.border}`,
+                  fontSize: "0.58rem", color: open ? C.accent : C.muted,
+                  transition: "all 0.2s",
+                }}>{open ? "▲" : "▼"}</span>
+                {configured ? "Update credentials" : "Set up connection"}
+              </span>
+              {info.helpUrl && (
+                <a
+                  href={info.helpUrl} target="_blank" rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ fontSize: "0.7rem", color: C.accent2, textDecoration: "none", fontWeight: 400 }}
+                >
+                  How? ↗
+                </a>
+              )}
+            </button>
+
+            {open && (
+              <div className="fade-up" style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                {info.fields.map((f) => (
+                  <Field key={f.key} label={f.label}>
+                    <Input
+                      type="password"
+                      placeholder={f.placeholder || ""}
+                      value={creds[f.key] || ""}
+                      onChange={(e) => setCreds((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                    />
+                  </Field>
+                ))}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                  <Btn variant="primary" size="sm" onClick={handleSave} disabled={saving}>
+                    {saving ? "Saving…" : "Save"}
+                  </Btn>
+                  <Btn variant="ghost" size="sm" onClick={handleTest} disabled={testing || !configured}>
+                    {testing ? "Testing…" : "Test"}
+                  </Btn>
+                </div>
+                {testResult && (
+                  <div className="fade-up" style={{
+                    marginTop: 8, fontSize: "0.75rem", padding: "9px 13px", borderRadius: 8, lineHeight: 1.5,
+                    background: testResult.ok ? `${C.supra}14` : `${C.danger}14`,
+                    border: `1px solid ${testResult.ok ? C.supra : C.danger}44`,
+                    color: testResult.ok ? C.supra : C.danger,
+                  }}>
+                    {testResult.ok ? "✓ Connection successful." : `✕ ${testResult.error || testResult.reason || "Failed — check credentials."}`}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {info.fields.length === 0 && (
+          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, marginTop: 4, fontSize: "0.74rem", color: C.muted }}>
+            Coming soon.
+          </div>
+        )}
+      </Card>
     );
-  };
+  }
+
+  const ChannelsPanel = () => (
+    <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {!isMobile && (
+        <div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Channels</div>
+          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 4 }}>
+            Connect your social networks and enable the ones you want to publish to.
+          </div>
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: isCompact ? "1fr" : "repeat(2,1fr)", gap: 14 }}>
+        {Object.keys(CHANNEL_INFO).map((id) => (
+          <SingleChannelCard key={id} id={id} />
+        ))}
+      </div>
+    </div>
+  );
+
   const Channels = <ChannelsPanel />;
 
   /* ============================================================
