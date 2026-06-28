@@ -474,28 +474,40 @@ function TopUpFlow({ walletAddress, onCredited }) {
   const [amount, setAmount] = useState(10);
   const [status, setStatus] = useState(null); // null | { step, message }
   const [error, setError] = useState("");
+  const [txHash, setTxHash] = useState("");
   const [done, setDone] = useState(false);
 
   async function handleDeposit() {
     setError("");
+    setTxHash("");
     setDone(false);
     const result = await depositSupra(walletAddress, Number(amount), setStatus);
     setStatus(null);
     if (result.ok) {
       setDone(true);
+      if (result.txHash) setTxHash(result.txHash);
       onCredited?.();
     } else {
       setError(result.error || "Deposit failed");
+      // Se a TX foi enviada mas backend falhou, mostra o hash para referência
+      if (result.txHash) setTxHash(result.txHash);
     }
   }
 
-  function reset() { setDone(false); setError(""); setStatus(null); }
+  function reset() { setDone(false); setError(""); setStatus(null); setTxHash(""); }
 
   if (done) {
     return (
       <div className="scale-in">
-        <div style={{ fontSize: "0.84rem", color: C.supra, fontWeight: 600, marginBottom: 10 }}>✓ Deposit confirmed and credited</div>
-        <Btn variant="ghost" size="sm" onClick={reset}>Make another deposit</Btn>
+        <div style={{ fontSize: "0.84rem", color: C.supra, fontWeight: 600, marginBottom: 10 }}>
+          ✓ {amount} SUPRA depositados com sucesso
+        </div>
+        {txHash && (
+          <div style={{ fontSize: "0.72rem", color: C.muted, marginBottom: 10, wordBreak: "break-all" }}>
+            TX: {txHash.slice(0, 20)}...
+          </div>
+        )}
+        <Btn variant="ghost" size="sm" onClick={reset}>Fazer outro depósito</Btn>
       </div>
     );
   }
@@ -510,7 +522,7 @@ function TopUpFlow({ walletAddress, onCredited }) {
           disabled={!!status}
         />
         <Btn variant="supra" onClick={handleDeposit} disabled={!!status}>
-          {status ? "..." : "Deposit"}
+          {status ? "..." : "Depositar"}
         </Btn>
       </div>
       {status && (
@@ -519,10 +531,20 @@ function TopUpFlow({ walletAddress, onCredited }) {
           {status.message}
         </div>
       )}
-      {error && <div style={{ fontSize: "0.74rem", color: C.danger, marginTop: 6 }}>{error}</div>}
+      {error && (
+        <div style={{ fontSize: "0.74rem", color: C.danger, marginTop: 6 }}>
+          ❌ {error}
+          {txHash && (
+            <div style={{ marginTop: 4, color: C.muted, wordBreak: "break-all" }}>
+              TX enviada: {txHash.slice(0, 20)}... (contacta suporte)
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
 
 /* ============================================================
    LOGIN SCREEN — wallet-based sign-in, no passwords or emails.
