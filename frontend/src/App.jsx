@@ -3,7 +3,6 @@ import { C } from "./theme";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 import { ComposePage } from "./pages/ComposePage";
 import { depositSupra } from "./payment";
-import { DepositModal } from "./components/ui/DepositModal";
 
 /* ============================================================
    DESIGN SYSTEM — "Pulse" v2
@@ -352,13 +351,75 @@ const CHANNEL_ICONS = {
 
 
 /* ============================================================
+   TOP UP FLOW — usa payment.js que trata da StarKey directamente.
+============================================================ */
+function TopUpFlow({ walletAddress, onCredited }) {
+  const [amount, setAmount] = useState(10);
+  const [status, setStatus] = useState(null);
+  const [error, setError] = useState("");
+  const [txHash, setTxHash] = useState("");
+  const [done, setDone] = useState(false);
+
+  async function handleDeposit() {
+    setError(""); setTxHash(""); setDone(false);
+    const result = await depositSupra(walletAddress, Number(amount), setStatus);
+    setStatus(null);
+    if (result.ok) {
+      setDone(true);
+      if (result.txHash) setTxHash(result.txHash);
+      onCredited?.();
+    } else {
+      setError(result.error || "Deposit failed");
+      if (result.txHash) setTxHash(result.txHash);
+    }
+  }
+
+  function reset() { setDone(false); setError(""); setStatus(null); setTxHash(""); }
+
+  if (done) {
+    return (
+      <div className="scale-in">
+        <div style={{ fontSize: "0.84rem", color: C.supra, fontWeight: 600, marginBottom: 10 }}>
+          ✓ {amount} SUPRA depositados com sucesso
+        </div>
+        {txHash && (
+          <div style={{ fontSize: "0.72rem", color: C.muted, marginBottom: 10, wordBreak: "break-all" }}>
+            TX: <a href={"https://suprascan.io/tx/" + txHash.replace("0x","")} target="_blank" rel="noreferrer" style={{color: C.accent2}}>{txHash.slice(0,22)}...</a>
+          </div>
+        )}
+        <Btn variant="ghost" size="sm" onClick={reset}>Fazer outro depósito</Btn>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <Input type="number" min="1" value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          style={{ flex: 1 }} disabled={!!status} />
+        <Btn variant="supra" onClick={handleDeposit} disabled={!!status}>
+          {status ? "..." : "Depositar"}
+        </Btn>
+      </div>
+      {status && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.76rem", color: C.text2 }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.accent, animation: "softPulse 1.2s ease-in-out infinite", display: "inline-block", flexShrink: 0 }} />
+          {status.message}
+        </div>
+      )}
+      {error && <div style={{ fontSize: "0.74rem", color: C.danger, marginTop: 6 }}>{error}</div>}
+    </div>
+  );
+}
+
+/* ============================================================
    MAIN APP
 ============================================================ */
 export default function App() {
   const { isMobile, isTablet, isDesktop } = useViewport();
   const isCompact = isMobile || isTablet; // shared layout rules for <1080
   const [tab, setTab] = useState("setup");
-  const [depositOpen, setDepositOpen] = useState(false);
   const [backendOk, setBackendOk] = useState(true);
 
   const [session, setSession] = useState(() => getSession());
@@ -547,7 +608,7 @@ export default function App() {
             <div style={{ fontFamily: C.mono, fontSize: "1.7rem", color: C.supra, fontWeight: 600 }}>{fmt(wallet.balance)} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span></div>
             <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 4 }}>Cost per post: {fmt(wallet.costPerPost)} SUPRA</div>
           </div>
-          <Btn variant="supra" onClick={() => setDepositOpen(true)}>+ Deposit SUPRA</Btn>
+          <TopUpFlow walletAddress={session?.address} onCredited={refreshAll} />
         </div>
       </Card>
 
@@ -966,8 +1027,6 @@ export default function App() {
           {panels[tab]}
         </div>
 
-        {depositOpen && <DepositModal wallet={wallet} walletAddress={session?.address} onCredited={refreshAll} onClose={() => setDepositOpen(false)} />}
-
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(16,14,26,0.9)", backdropFilter: "blur(12px)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
           {TABS.map(({ id, icon, label }) => (
             <div key={id} onClick={() => setTab(id)} style={{
@@ -1017,8 +1076,7 @@ export default function App() {
           {panels[tab]}
         </div>
       </div>
-      {depositOpen && <DepositModal wallet={wallet} walletAddress={session?.address} onCredited={refreshAll} onClose={() => setDepositOpen(false)} />}
-    );
+          );
   }
 
   // Desktop: full 3-column layout (sidebar + content + context rail)
@@ -1058,7 +1116,7 @@ export default function App() {
             <div style={{ fontSize: "0.64rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Balance</div>
             <div style={{ fontFamily: C.mono, fontSize: "1.5rem", color: C.supra, fontWeight: 600, marginTop: 5 }}>{fmt(wallet.balance)}</div>
             <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 3 }}>SUPRA tokens</div>
-            <Btn full variant="supra" size="sm" style={{ marginTop: 12 }} onClick={() => setDepositOpen(true)}>Deposit SUPRA</Btn>
+            <Btn full variant="supra" size="sm" style={{ marginTop: 12 }} onClick={() => setTab("setup")}>Deposit SUPRA</Btn>
           </Card>
 
           <div style={{ fontSize: "0.62rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.15em", padding: "18px 14px 9px" }}>Channels</div>
@@ -1102,7 +1160,6 @@ export default function App() {
           )}
         </div>
       </div>
-      {depositOpen && <DepositModal wallet={wallet} walletAddress={session?.address} onCredited={refreshAll} onClose={() => setDepositOpen(false)} />}
-    </div>
+          </div>
   );
 }
