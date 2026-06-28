@@ -166,6 +166,14 @@ async function main() {
     });
   }
 
+  // GET /api/wallet/deposits — histórico de depósitos do utilizador
+  app.get("/api/wallet/deposits", requireAuth, async (req, res) => {
+    await db.read();
+    const user = db.forUser(req.walletAddress);
+    const deposits = Array.isArray(user.wallet.deposits) ? user.wallet.deposits : [];
+    res.json({ ok: true, deposits });
+  });
+
   // ── Real, non-custodial deposits ──
   // Step 1: user requests an intent for an amount they want to deposit.
   // We hand back a precise amount (with a unique decimal fingerprint) and

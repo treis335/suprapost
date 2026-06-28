@@ -468,6 +468,110 @@ function ChannelRow({ id, channel, onToggle, onSaveCredentials }) {
 }
 
 /* ============================================================
+   DEPOSIT HISTORY — lista os depósitos confirmados do utilizador
+============================================================ */
+function DepositHistory() {
+  const [deposits, setDeposits] = React.useState(null); // null=loading, []=vazio
+  const [open, setOpen] = React.useState(false);
+
+  async function load() {
+    try {
+      const session = getSession();
+      const res = await fetch("/api/wallet/deposits", {
+        headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {},
+      });
+      const data = await res.json();
+      setDeposits(data.ok ? data.deposits : []);
+    } catch {
+      setDeposits([]);
+    }
+  }
+
+  function toggle() {
+    if (!open && deposits === null) load();
+    setOpen(o => !o);
+  }
+
+  function fmtDate(ts) {
+    return new Date(ts).toLocaleString("pt-PT", {
+      day: "2-digit", month: "2-digit", year: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+
+  function shortHash(h) {
+    if (!h) return "—";
+    return h.slice(0, 8) + "…" + h.slice(-6);
+  }
+
+  function explorerUrl(hash) {
+    const clean = hash.startsWith("0x") ? hash.slice(2) : hash;
+    return `https://suprascan.io/tx/${clean}`;
+  }
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <button
+        onClick={toggle}
+        style={{
+          background: "none", border: "none", cursor: "pointer",
+          color: C.text2, fontSize: "0.76rem", padding: 0,
+          display: "flex", alignItems: "center", gap: 5,
+        }}
+      >
+        <span style={{ fontSize: "0.65rem", transition: "transform 0.2s", display: "inline-block", transform: open ? "rotate(90deg)" : "none" }}>▶</span>
+        Histórico de depósitos
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 10 }} className="fade-up">
+          {deposits === null && (
+            <div style={{ fontSize: "0.73rem", color: C.muted }}>A carregar...</div>
+          )}
+          {deposits !== null && deposits.length === 0 && (
+            <div style={{ fontSize: "0.73rem", color: C.muted }}>Sem depósitos registados.</div>
+          )}
+          {deposits !== null && deposits.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {deposits.map((d) => (
+                <div
+                  key={d.id}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    background: C.surface2, borderRadius: 8, padding: "7px 11px",
+                    fontSize: "0.73rem",
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ color: C.supra, fontWeight: 600 }}>+{d.amount} SUPRA</span>
+                    <span style={{ color: C.muted }}>{fmtDate(d.createdAt)}</span>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    {d.txHash ? (
+                      <a
+                        href={explorerUrl(d.txHash)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: C.accent, textDecoration: "none", fontFamily: C.mono, fontSize: "0.68rem" }}
+                        title={d.txHash}
+                      >
+                        {shortHash(d.txHash)} ↗
+                      </a>
+                    ) : (
+                      <span style={{ color: C.muted, fontFamily: C.mono, fontSize: "0.68rem" }}>sem hash</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    TOP UP FLOW — uses payment.js which handles StarKey directly.
 ============================================================ */
 function TopUpFlow({ walletAddress, onCredited }) {
@@ -848,10 +952,12 @@ export default function App() {
         <TopUpFlow walletAddress={session?.address} onCredited={refreshAll} />
 
         <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 14, lineHeight: 1.6 }}>
-          Deposits are non-custodial — you sign the transfer from your own
-          wallet, and we never hold your private key. Once the network
-          confirms it, your balance updates automatically.
+          Os depósitos são não-custodiais — assinas a transferência da tua própria
+          carteira e nunca guardamos a tua chave privada. Após confirmação na rede,
+          o saldo é creditado automaticamente.
         </div>
+
+        <DepositHistory />
       </Card>
 
       <Card eyebrow="Voice & Content" title="Content Profile">

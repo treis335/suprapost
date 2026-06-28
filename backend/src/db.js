@@ -49,6 +49,7 @@ function freshUserData() {
     wallet: {
       balance: 0,
       costPerPost: 1,
+      deposits: [], // { id, amount, txHash, createdAt, encodedAmount }
     },
     stats: {
       totalGenerations: 0,

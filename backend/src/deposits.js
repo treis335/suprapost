@@ -92,6 +92,15 @@ async function pollForDeposits(db) {
     user.wallet.balance = +(user.wallet.balance + intent.requestedAmount).toFixed(8);
     await db.write();
 
+    if (!Array.isArray(user.wallet.deposits)) user.wallet.deposits = [];
+    user.wallet.deposits.unshift({
+      id:            intent.id,
+      amount:        intent.requestedAmount,
+      encodedAmount: intent.encodedAmount,
+      txHash:        tx.hash,
+      createdAt:     Date.now(),
+    });
+    if (user.wallet.deposits.length > 50) user.wallet.deposits = user.wallet.deposits.slice(0, 50);
     intent.fulfilled = true;
     intent.txHash = tx.hash;
     fulfilled.push(intent);
@@ -139,10 +148,20 @@ async function confirmDepositByTxHash(db, intent, txHash) {
     }
   }
 
-  // Creditar
+  // Creditar e guardar no histórico
   await db.read();
   const user = db.forUser(intent.userAddress);
   user.wallet.balance = +(user.wallet.balance + intent.requestedAmount).toFixed(8);
+  if (!Array.isArray(user.wallet.deposits)) user.wallet.deposits = [];
+  user.wallet.deposits.unshift({
+    id:            intent.id,
+    amount:        intent.requestedAmount,
+    encodedAmount: intent.encodedAmount,
+    txHash:        txHash,
+    createdAt:     Date.now(),
+  });
+  // Manter apenas os últimos 50 depósitos
+  if (user.wallet.deposits.length > 50) user.wallet.deposits = user.wallet.deposits.slice(0, 50);
   await db.write();
 
   intent.fulfilled = true;
