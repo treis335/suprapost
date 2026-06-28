@@ -35,13 +35,14 @@ const pendingIntents = new Map();
 
 /**
  * Encodes a small unique fingerprint into the decimal tail of the amount.
- * E.g. requested 50 SUPRA -> 50.000437. The chance of two simultaneous
- * pending intents colliding on the same encoded amount is astronomically
- * small (1 in ~900,000), and even then we just ask the user to retry.
+ * E.g. requested 50 SUPRA -> 50.00004371. Supra has 8 decimal places (1 SUPRA
+ * = 100,000,000 octas), so we use exactly 8 dp and keep the fingerprint in
+ * the last 4 digits — giving 10,000 possible values, astronomically unlikely
+ * to collide for the small number of concurrent deposits we expect.
  */
 function encodeAmount(requestedAmount) {
-  const tail = Math.floor(Math.random() * 900000) + 100000; // 6-digit tail, no leading zero ambiguity
-  const encoded = +(requestedAmount + tail / 1e9).toFixed(9);
+  const tail = Math.floor(Math.random() * 9000) + 1000; // 4-digit tail, fits in 8 dp
+  const encoded = +(requestedAmount + tail / 1e8).toFixed(8);
   return { encoded, tail };
 }
 
@@ -72,7 +73,7 @@ function createDepositIntent(userAddress, requestedAmount) {
     expiresAt: Date.now() + INTENT_TTL_MS,
     fulfilled: false,
   };
-  pendingIntents.set(encoded.toFixed(9), intent);
+  pendingIntents.set(encoded.toFixed(8), intent);
   return intent;
 }
 
@@ -123,9 +124,9 @@ async function pollForDeposits(db) {
     // with confirmed parsing once tested against testnet.
     const amountOctas = tx?.payload?.amount ?? tx?.output?.amount; // best-effort, confirm against real data
     if (amountOctas == null) continue;
-    const amountSupra = +(Number(amountOctas) / OCTAS_PER_SUPRA).toFixed(9);
+    const amountSupra = +(Number(amountOctas) / OCTAS_PER_SUPRA).toFixed(8);
 
-    const key = amountSupra.toFixed(9);
+    const key = amountSupra.toFixed(8);
     const intent = pendingIntents.get(key);
     if (!intent || intent.fulfilled) continue;
 
