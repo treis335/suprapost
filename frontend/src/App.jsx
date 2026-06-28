@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "./theme";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 import { ComposePage } from "./pages/ComposePage";
+import { DepositPage } from "./pages/DepositPage";
 import { depositSupra } from "./payment";
 
 /* ============================================================
@@ -21,6 +22,7 @@ const TABS = [
   { id: "compose",  icon: "✦", label: "Compose" },
   { id: "automation", icon: "⚡", label: "Automation" },
   { id: "history", icon: "📋", label: "History" },
+  { id: "deposit", icon: "⬡", label: "Deposit" },
 ];
 
 const fmt = (n) => Number(n ?? 0).toFixed(2);
@@ -925,39 +927,26 @@ export default function App() {
         <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6 }}>
           {backendOk
             ? "Server is running — settings and history stay saved even if you close this page."
-            : "No connection to the backend. Make sure the server is running (npm start in the backend folder)."}
+            : "Not connected. Please make sure the SupraPost server is running."}
         </div>
       </Card>
 
       <Card eyebrow={`Broadcast · ${enabledChannelCount} active`} title="Channels" accentTop={C.accent}>
-        <div style={{ display: "grid", gridTemplateColumns: channelGridCols, gap: 10, marginBottom: 4 }}>
+        <div style={{ display: "grid", gridTemplateColumns: channelGridCols, gap: 10 }}>
           {Object.entries(channels).map(([id, ch]) => (
             <ChannelRow key={id} id={id} channel={ch} onToggle={toggleChannel} onSaveCredentials={saveChannelCredentials} />
           ))}
         </div>
-        <div style={{ fontSize: "0.68rem", color: C.muted, marginTop: 12, lineHeight: 1.6 }}>
-          Each generated post broadcasts to every channel toggled on above. New platforms get configured in the backend's <code style={{ background: C.bg, padding: "2px 7px", borderRadius: 5, fontFamily: C.mono, fontSize: "0.72rem" }}>.env</code> file, then show up here automatically.
-        </div>
       </Card>
 
-      <Card eyebrow="Payments" title="SUPRA Wallet" accentTop={C.supra}>
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ fontFamily: C.mono, fontSize: "1.7rem", color: C.supra, fontWeight: 600 }}>{fmt(wallet.balance)} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span></div>
-          <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 4 }}>Cost per post: {fmt(wallet.costPerPost)} SUPRA</div>
+      <Card eyebrow="Payments" title="SUPRA Balance" accentTop={C.supra}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontFamily: C.mono, fontSize: "1.7rem", color: C.supra, fontWeight: 600 }}>{fmt(wallet.balance)} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span></div>
+            <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 4 }}>Cost per post: {fmt(wallet.costPerPost)} SUPRA</div>
+          </div>
+          <Btn variant="supra" onClick={() => setTab("deposit")}>+ Deposit SUPRA</Btn>
         </div>
-
-        <div style={{ height: 1, background: C.border, marginBottom: 16 }} />
-
-        <div style={{ fontSize: "0.78rem", fontWeight: 600, marginBottom: 10 }}>Deposit SUPRA</div>
-        <TopUpFlow walletAddress={session?.address} onCredited={refreshAll} />
-
-        <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 14, lineHeight: 1.6 }}>
-          Os depósitos são não-custodiais — assinas a transferência da tua própria
-          carteira e nunca guardamos a tua chave privada. Após confirmação na rede,
-          o saldo é creditado automaticamente.
-        </div>
-
-        <DepositHistory />
       </Card>
 
       <Card eyebrow="Voice & Content" title="Content Profile">
@@ -981,11 +970,6 @@ export default function App() {
         <Btn variant="primary" onClick={saveSettings}>Save profile</Btn>
       </Card>
 
-      <Card eyebrow="Next Steps" title="API Configuration">
-        <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.7 }}>
-          The DeepSeek and channel keys are configured in the backend's <code style={{ background: C.bg, padding: "2px 7px", borderRadius: 5, fontFamily: C.mono, fontSize: "0.78rem" }}>.env</code> file — never here, for security. Edit <code style={{ background: C.bg, padding: "2px 7px", borderRadius: 5, fontFamily: C.mono, fontSize: "0.78rem" }}>backend/.env</code> and restart the server.
-        </div>
-      </Card>
     </div>
   );
 
@@ -1144,11 +1128,6 @@ export default function App() {
           })}
         </div>
 
-        <Card eyebrow="Note" style={{ background: "transparent", border: `1px dashed ${C.border}` }}>
-          <div style={{ fontSize: "0.78rem", color: C.text2, lineHeight: 1.65 }}>
-            Credentials are stored server-side in <code style={{ background: C.bg, padding: "2px 6px", borderRadius: 5, fontFamily: C.mono, fontSize: "0.74rem" }}>backend/data/db.json</code> — never sent back to the browser. When toggling channels on/off, the credentials remain intact.
-          </div>
-        </Card>
       </div>
     );
   };
@@ -1233,12 +1212,6 @@ export default function App() {
             </Field>
           )}
         </Card>
-
-        <Card eyebrow="How It Works" title="The Server Takes Over">
-          <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.75 }}>
-            Once you start automation, the backend generates, charges SUPRA, and broadcasts to every enabled channel on its own, on the cycle you set. You don't need to keep this page open — only the server (<code style={{ background: C.bg, padding: "2px 7px", borderRadius: 5, fontFamily: C.mono, fontSize: "0.76rem" }}>npm start</code>) needs to be running.
-          </div>
-        </Card>
       </div>
     </div>
   );
@@ -1290,7 +1263,16 @@ export default function App() {
     </div>
   );
 
-  const panels = { setup: Setup, channels: Channels, compose: Generate, automation: Automation, history: History };
+  const Deposit = (
+    <DepositPage
+      isMobile={isMobile}
+      wallet={wallet}
+      walletAddress={session?.address}
+      onCredited={refreshAll}
+    />
+  );
+
+  const panels = { setup: Setup, channels: Channels, compose: Generate, automation: Automation, history: History, deposit: Deposit };
 
   /* ============================================================
      AUTH GATE — show the wallet sign-in screen until we have a session
@@ -1408,7 +1390,7 @@ export default function App() {
             <div style={{ fontSize: "0.64rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Balance</div>
             <div style={{ fontFamily: C.mono, fontSize: "1.5rem", color: C.supra, fontWeight: 600, marginTop: 5 }}>{fmt(wallet.balance)}</div>
             <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 3 }}>SUPRA tokens</div>
-            <Btn full variant="supra" size="sm" style={{ marginTop: 12 }} onClick={() => setTab("setup")}>Deposit SUPRA</Btn>
+            <Btn full variant="supra" size="sm" style={{ marginTop: 12 }} onClick={() => setTab("deposit")}>Deposit SUPRA</Btn>
           </Card>
 
           <div style={{ fontSize: "0.62rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.15em", padding: "18px 14px 9px" }}>Channels</div>
