@@ -371,7 +371,7 @@ async function main() {
 
   app.post("/api/automation/start", requireAuth, async (req, res) => {
     await db.read();
-    startAutomation(db, req.walletAddress);
+    await startAutomation(db, req.walletAddress);
     await db.write();
     res.json(db.forUser(req.walletAddress).automation);
   });
