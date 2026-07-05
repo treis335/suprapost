@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { C } from "../../theme";
 import { Btn, Card, Field, Input, Switch } from "../ui";
 
@@ -11,13 +11,9 @@ export function ChannelCard({ channel, onSave, onTest }) {
   const [testResult, setTestResult] = useState(null);
   const [saved, setSaved]         = useState(false);
 
-  useEffect(() => {
-    // Só sincroniza do parent se o utilizador não estiver a editar.
-    // Sem isto, o polling do backend fechava os campos e limpava os valores.
-    if (dirty) return;
-    setValues(channel.values ?? {});
-    setEnabled(channel.enabled ?? false);
-  }, [channel.id, channel.configured]);
+  // Sem useEffect de sincronização — o estado local é soberano.
+  // O polling do App.jsx não deve interferir com o que o user está a escrever.
+  // Os valores só mudam quando o user guarda (handleSave).
 
   function setField(key, val) {
     setValues((v) => ({ ...v, [key]: val }));

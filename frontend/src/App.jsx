@@ -612,21 +612,26 @@ export default function App() {
   const refreshAll = useCallback(async () => {
     if (!session) return;
     try {
-      const [s, w, a, p, st, ch] = await Promise.all([
-        api.get("/settings"), api.get("/wallet"), api.get("/automation"), api.get("/posts"), api.get("/stats"), api.get("/channels"),
+      const [s, w, a, p, st] = await Promise.all([
+        api.get("/settings"), api.get("/wallet"), api.get("/automation"), api.get("/posts"), api.get("/stats"),
       ]);
       if (s.unauthorized) { handleSignOut(); return; }
-      const channelsArr = Array.isArray(ch) ? ch : Object.values(ch || {});
-      setSettings(s); setWallet(w); setAutomation(a); setPosts(p); setStats(st); setChannels(channelsArr);
+      setSettings(s); setWallet(w); setAutomation(a); setPosts(p); setStats(st);
     } catch {}
   }, [session]);
 
   useEffect(() => {
     if (!session) return;
+    // Carregar channels apenas uma vez — não fazem parte do polling
+    // para não interferir com o utilizador a escrever credenciais
+    api.get("/channels").then(ch => {
+      const arr = Array.isArray(ch) ? ch : Object.values(ch || {});
+      setChannels(arr);
+    }).catch(() => {});
     refreshAll();
     const interval = setInterval(refreshAll, 5000);
     return () => clearInterval(interval);
-  }, [refreshAll, session]);
+  }, [session]);
 
   useEffect(() => {
     clearInterval(timerRef.current);
