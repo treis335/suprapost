@@ -12,9 +12,11 @@ export function ChannelCard({ channel, onSave, onTest }) {
   const [saved, setSaved]         = useState(false);
 
   useEffect(() => {
+    // Só sincroniza do parent se o utilizador não estiver a editar.
+    // Sem isto, o polling do backend fechava os campos e limpava os valores.
+    if (dirty) return;
     setValues(channel.values ?? {});
     setEnabled(channel.enabled ?? false);
-    setDirty(false);
   }, [channel.id, channel.configured]);
 
   function setField(key, val) {
