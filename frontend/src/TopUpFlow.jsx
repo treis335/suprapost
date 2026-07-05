@@ -112,9 +112,9 @@ export function TopUpFlow({ walletAddress, onCredited }) {
           {status ? (
             <>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#0a1f13", animation: "softPulse 1s ease-in-out infinite", display: "inline-block" }} />
-              {status.message || "A processar..."}
+              {status.message || "Processing..."}
             </>
-          ) : "Depositar"}
+          ) : "Deposit"}
         </button>
       </div>
 

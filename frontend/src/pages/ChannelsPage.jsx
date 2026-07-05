@@ -120,7 +120,7 @@ function ChannelRow({ id, channel, onSave, onToggle, onTest }) {
         <button
           onClick={handleToggle}
           disabled={!configured}
-          title={configured ? (enabled ? "Pausar" : "Ativar") : "Guarda as credenciais primeiro"}
+          title={configured ? (enabled ? "Pause" : "Enable") : "Save credentials first"}
           style={{
             width: 44, height: 25, borderRadius: 20, padding: 0, border: "none",
             background: enabled && configured ? info.color : C.border,

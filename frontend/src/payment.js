@@ -207,7 +207,7 @@ export async function depositSupra(walletAddress, amountSupra, onStatus = () => 
     // 2. Send TX via StarKey
     onStatus({
       step: "sending",
-      message: `Confirma ${intent.encodedAmount} SUPRA na StarKey...`,
+      message: `Confirm ${intent.encodedAmount} SUPRA na StarKey...`,
     });
     let txHash;
     try {
@@ -231,7 +231,7 @@ export async function depositSupra(walletAddress, amountSupra, onStatus = () => 
       };
     }
 
-    // 3. Confirmar no backend
+    // 3. Confirmr no backend
     onStatus({ step: "confirming", message: "Verifying transaction on chain..." });
     const confirmRes = await apiConfirmDeposit(intent.id, txHash);
     if (!confirmRes.ok) {

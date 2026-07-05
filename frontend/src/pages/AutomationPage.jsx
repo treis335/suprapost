@@ -39,7 +39,7 @@ export function AutomationPage({
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 13 }}>
-        <StatTile label="Posts Auto" value={posts.filter((p) => p.auto).length} color={C.supra} />
+        <StatTile label="Auto Posts" value={posts.filter((p) => p.auto).length} color={C.supra} />
         <StatTile label="SUPRA / Post" value={fmt(wallet.costPerPost)} color={C.accent} />
         <StatTile label="Total Spent" value={fmt(stats.supraEarned)} color={C.warn} />
         <StatTile label="Generated" value={stats.totalGenerations} color={C.accent2} />

@@ -136,7 +136,7 @@ export function ChannelCard({ channel, onSave, onTest }) {
               display: "inline-flex", alignItems: "center", gap: 4,
               marginBottom: 14, alignSelf: "flex-start", opacity: 0.85,
             }}>
-              Onde encontro estas credenciais? ↗
+              Where do I find these? ↗
             </a>
           )}
 

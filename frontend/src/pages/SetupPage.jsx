@@ -30,9 +30,9 @@ export function SetupPage({ isMobile, wallet, walletAddress, onCredited, setting
           <Field label="Tone of voice">
             <Select value={settings.tone} onChange={(e) => updateSetting("tone", e.target.value)} onBlur={saveSettings}>
               <option value="technical">Technical & Informative</option>
-              <option value="casual">Casual & Apelativo</option>
+              <option value="casual">Casual & Engaging</option>
               <option value="hype">Hype & Bullish</option>
-              <option value="educational">Educacional</option>
+              <option value="educational">Educational</option>
               <option value="alpha">Alpha Calls</option>
             </Select>
           </Field>
@@ -40,7 +40,7 @@ export function SetupPage({ isMobile, wallet, walletAddress, onCredited, setting
           <Field label="Topics to avoid"><Input placeholder="e.g. politics, price predictions" value={settings.avoid} onChange={(e) => updateSetting("avoid", e.target.value)} onBlur={saveSettings} /></Field>
         </div>
         <Field label="Example posts you like" hint="One per line — helps the AI match your style">
-          <TextArea placeholder="Cola 3-5 exemplos de posts..." value={settings.examples} onChange={(e) => updateSetting("examples", e.target.value)} onBlur={saveSettings} />
+          <TextArea placeholder="Paste 3-5 example posts..." value={settings.examples} onChange={(e) => updateSetting("examples", e.target.value)} onBlur={saveSettings} />
         </Field>
         <Btn variant="primary" onClick={saveSettings}>Save profile</Btn>
       </Card>

@@ -331,7 +331,7 @@ function OnboardingChecklist({ settings, channels, wallet, onNavigate }) {
   const steps = [
     { done: hasProfile, label: "Fill in your content profile", action: null },
     { done: hasChannel, label: "Connect a channel", action: () => onNavigate("channels") },
-    { done: hasBalance, label: "Depositar SUPRA", action: () => onNavigate("setup") },
+    { done: hasBalance, label: "Deposit SUPRA", action: () => onNavigate("setup") },
   ];
 
   return (
@@ -564,7 +564,7 @@ function TopUpFlow({ walletAddress, onCredited }) {
         <Input type="number" min="1" value={amount}
           onChange={(e) => setAmount(e.target.value)} style={{ flex: 1 }} disabled={!!status} />
         <Btn variant="supra" onClick={handleDeposit} disabled={!!status}>
-          {status ? "…" : "Depositar SUPRA"}
+          {status ? "…" : "Deposit SUPRA"}
         </Btn>
       </div>
       {status && (
@@ -719,7 +719,7 @@ export default function App() {
       {!isMobile && (
         <div>
           <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Setup</div>
-          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>Configure your content profile and publishing preferences.</div>
+          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>Define your style, niche and content preferences.</div>
         </div>
       )}
 
@@ -741,7 +741,7 @@ export default function App() {
               {shortAddress(session?.address)}
             </div>
           </div>
-          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sair</Btn>
+          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
         </div>
       </Card>
 
@@ -887,7 +887,7 @@ export default function App() {
           {!isMobile && <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>History</div>}
           <div style={{ fontSize: isMobile ? "0.95rem" : "0.85rem", color: isMobile ? C.text : C.muted, fontWeight: isMobile ? 700 : 400, marginTop: isMobile ? 0 : 5 }}>{posts.length} total posts</div>
         </div>
-        {historyTab === "posts" && <Btn variant="danger" size="sm" onClick={clearHistory}>Limpar tudo</Btn>}
+        {historyTab === "posts" && <Btn variant="danger" size="sm" onClick={clearHistory}>Clear all</Btn>}
       </div>
 
       {/* Tab switcher */}
@@ -901,7 +901,7 @@ export default function App() {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 13 }}>
             <StatTile label="Total Posts" value={stats.totalPosts} color={C.accent2} />
-            <StatTile label="SUPRA Usado" value={fmt(stats.supraEarned)} color={C.supra} />
+            <StatTile label="SUPRA Used" value={fmt(stats.supraEarned)} color={C.supra} />
           </div>
           {posts.length === 0 ? (
             <Card style={{ textAlign: "center", padding: 48, border: `1.5px dashed ${C.border}`, background: "transparent" }}>
@@ -1019,7 +1019,7 @@ export default function App() {
           <Pill color={C.supra}>⬡ {fmt(wallet.balance)} SUPRA</Pill>
           <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Automation active" : "Idle"}</Pill>
           <Pill color={C.accent2} title={session?.address}>{shortAddress(session?.address)}</Pill>
-          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sair</Btn>
+          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
         </div>
       </div>
 

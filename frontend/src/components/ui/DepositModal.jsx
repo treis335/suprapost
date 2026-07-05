@@ -11,7 +11,7 @@ export function DepositModal({ wallet, walletAddress, onCredited, onClose }) {
   const [txHash, setTxHash] = useState("");
   const [done, setDone]     = useState(false);
 
-  // Fechar com Escape
+  // Close on Escape
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
@@ -94,7 +94,7 @@ export function DepositModal({ wallet, walletAddress, onCredited, onClose }) {
                   fontSize: "1.5rem", color: C.supra,
                 }}>✓</div>
                 <div style={{ fontSize: "1.05rem", fontWeight: 700, color: C.supra, marginBottom: 6 }}>
-                  {amount} SUPRA adicionados!
+                  {amount} SUPRA added!
                 </div>
                 <div style={{ fontSize: "0.78rem", color: C.text2, marginBottom: 16, lineHeight: 1.5 }}>
                   Your balance has been updated.
@@ -104,7 +104,7 @@ export function DepositModal({ wallet, walletAddress, onCredited, onClose }) {
                     <a href={`https://suprascan.io/tx/${txHash.replace("0x", "")}`}
                       target="_blank" rel="noreferrer"
                       style={{ fontSize: "0.72rem", color: C.accent2, fontFamily: C.mono, textDecoration: "none" }}>
-                      Ver no SupraScan ↗
+                      View on SupraScan ↗
                     </a>
                   </div>
                 )}
@@ -113,12 +113,12 @@ export function DepositModal({ wallet, walletAddress, onCredited, onClose }) {
                     all: "unset", cursor: "pointer", padding: "8px 16px", borderRadius: 9,
                     fontSize: "0.8rem", fontWeight: 600, color: C.text2,
                     background: C.raised, border: `1px solid ${C.border}`,
-                  }}>Depositar mais</button>
+                  }}>Deposit more</button>
                   <button onClick={onClose} style={{
                     all: "unset", cursor: "pointer", padding: "8px 16px", borderRadius: 9,
                     fontSize: "0.8rem", fontWeight: 600, color: "#fff",
                     background: `linear-gradient(135deg, ${C.accent}, ${C.accentDeep})`,
-                  }}>Fechar</button>
+                  }}>Close</button>
                 </div>
               </div>
             ) : (
@@ -168,9 +168,9 @@ export function DepositModal({ wallet, walletAddress, onCredited, onClose }) {
                           width: 7, height: 7, borderRadius: "50%", background: "#0a1f13",
                           animation: "softPulse 1s ease-in-out infinite", display: "inline-block",
                         }} />
-                        {status.message || "A processar..."}
+                        {status.message || "Processing..."}
                       </>
-                    ) : "Depositar"}
+                    ) : "Deposit"}
                   </button>
                 </div>
 
@@ -198,10 +198,10 @@ export function DepositModal({ wallet, walletAddress, onCredited, onClose }) {
                     {error}
                     {txHash && (
                       <div style={{ marginTop: 5, fontSize: "0.7rem" }}>
-                        TX enviada —{" "}
+                        TX sent —{" "}
                         <a href={`https://suprascan.io/tx/${txHash.replace("0x","")}`}
                           target="_blank" rel="noreferrer" style={{ color: C.accent2 }}>
-                          ver no explorer ↗
+                          view on explorer ↗
                         </a>
                       </div>
                     )}
