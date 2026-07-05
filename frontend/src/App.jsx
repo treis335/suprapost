@@ -646,7 +646,7 @@ export default function App() {
   async function saveSettings() {
     const updated = await api.post("/settings", settings);
     setSettings(updated);
-    showToast("Settings saved ✓");
+    showToast("Perfil guardado ✓");
   }
 
   async function toggleChannel(id, enabled) {
@@ -962,15 +962,15 @@ export default function App() {
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: isMobile ? 16 : 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          {!isMobile && <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>History</div>}
-          <div style={{ fontSize: isMobile ? "0.95rem" : "0.85rem", color: isMobile ? C.text : C.muted, fontWeight: isMobile ? 700 : 400, marginTop: isMobile ? 0 : 5 }}>{posts.length} posts total</div>
+          {!isMobile && <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Histórico</div>}
+          <div style={{ fontSize: isMobile ? "0.95rem" : "0.85rem", color: isMobile ? C.text : C.muted, fontWeight: isMobile ? 700 : 400, marginTop: isMobile ? 0 : 5 }}>{posts.length} publicações no total</div>
         </div>
-        {historyTab === "posts" && <Btn variant="danger" size="sm" onClick={clearHistory}>Clear all</Btn>}
+        {historyTab === "posts" && <Btn variant="danger" size="sm" onClick={clearHistory}>Limpar tudo</Btn>}
       </div>
 
       {/* Tab switcher */}
       <div style={{ display: "flex", gap: 6, borderBottom: `1px solid ${C.border}`, paddingBottom: 0 }}>
-        {[["posts", "📝 Posts"], ["deposits", "💳 Deposits"]].map(([id, label]) => (
+        {[["posts", "📝 Publicações"], ["deposits", "💳 Depósitos"]].map(([id, label]) => (
           <button key={id} onClick={() => setHistoryTab(id)} style={{ all: "unset", cursor: "pointer", padding: "8px 16px", fontSize: "0.8rem", fontWeight: 600, color: historyTab === id ? C.text : C.muted, borderBottom: `2px solid ${historyTab === id ? C.accent : "transparent"}`, transition: "all 0.18s" }}>{label}</button>
         ))}
       </div>
@@ -979,7 +979,7 @@ export default function App() {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 13 }}>
             <StatTile label="Total Posts" value={stats.totalPosts} color={C.accent2} />
-            <StatTile label="SUPRA Used" value={fmt(stats.supraEarned)} color={C.supra} />
+            <StatTile label="SUPRA Usado" value={fmt(stats.supraEarned)} color={C.supra} />
           </div>
           {posts.length === 0 ? (
             <Card style={{ textAlign: "center", padding: 48, border: `1.5px dashed ${C.border}`, background: "transparent" }}>
@@ -990,7 +990,7 @@ export default function App() {
               {posts.map(p => (
                 <Card key={p.id}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 11, flexWrap: "wrap", gap: 6 }}>
-                    <Pill color={p.auto ? C.accent2 : C.accent}>{p.auto ? "↻ auto" : "✋ manual"}</Pill>
+                    <Pill color={p.auto ? C.accent2 : C.accent}>{p.auto ? "↻ automático" : "✋ manual"}</Pill>
                     <span style={{ fontSize: "0.66rem", color: C.muted, fontFamily: C.mono }}>{new Date(p.time).toLocaleString()}</span>
                   </div>
                   <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6, marginBottom: 10 }}>{p.text.substring(0, 160)}{p.text.length > 160 ? "…" : ""}</div>
@@ -1095,7 +1095,7 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
           <Pill color={C.supra}>⬡ {fmt(wallet.balance)} SUPRA</Pill>
-          <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Automation active" : "Idle"}</Pill>
+          <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Automação ativa" : "Idle"}</Pill>
           <Pill color={C.accent2} title={session?.address}>{shortAddress(session?.address)}</Pill>
           <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sair</Btn>
         </div>
