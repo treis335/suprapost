@@ -49,9 +49,10 @@ async function runGenerationCycle(db, address, opts = {}) {
   if (mode === "image" || mode === "both") {
     push(`🖼 Generating image (style: ${imageStyle})...`);
     const result = await generateImage({
-      postText: text || settings.niche || "Web3 blockchain crypto",
-      style: imageStyle,
+      postText:     text || settings.niche || "Web3 blockchain crypto",
+      style:        imageStyle,
       customPrompt: imageCustomPrompt,
+      modo_economico: opts.modo_economico ?? true,   // default: economy mode ON
     });
     if (result.ok) {
       imagePath     = result.imagePath;
