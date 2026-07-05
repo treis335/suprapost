@@ -41,8 +41,8 @@ export function AutomationPage({
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 13 }}>
         <StatTile label="Posts Auto" value={posts.filter((p) => p.auto).length} color={C.supra} />
         <StatTile label="SUPRA / Post" value={fmt(wallet.costPerPost)} color={C.accent} />
-        <StatTile label="Total Gasto" value={fmt(stats.supraEarned)} color={C.warn} />
-        <StatTile label="Gerados" value={stats.totalGenerations} color={C.accent2} />
+        <StatTile label="Total Spent" value={fmt(stats.supraEarned)} color={C.warn} />
+        <StatTile label="Generated" value={stats.totalGenerations} color={C.accent2} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
@@ -53,11 +53,17 @@ export function AutomationPage({
             disabled={automation.running}
             style={{ marginBottom: 13 }}
           >
-            <option value={3600}>A cada 1 hora</option>
-            <option value={10800}>A cada 3 horas</option>
-            <option value={21600}>A cada 6 horas</option>
-            <option value={43200}>A cada 12 horas</option>
-            <option value={86400}>1 vez por dia</option>
+            <option value={30}>Every 30 seconds</option>
+            <option value={60}>Every 1 minute</option>
+            <option value={300}>Every 5 minutes</option>
+            <option value={600}>Every 10 minutes</option>
+            <option value={900}>Every 15 minutes</option>
+            <option value={1800}>Every 30 minutes</option>
+            <option value={3600}>Every 1 hour</option>
+            <option value={10800}>Every 3 hours</option>
+            <option value={21600}>Every 6 hours</option>
+            <option value={43200}>Every 12 hours</option>
+            <option value={86400}>Once a day</option>
           </Select>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 15px" }}>
             <div>

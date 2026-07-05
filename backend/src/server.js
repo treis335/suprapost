@@ -258,7 +258,7 @@ async function main() {
     res.json(maskChannels(user.channels));
   });
 
-  // Test a channel's saved credentials without publishing anything
+  // Test a channel's saved credentials by sending a real test post
   app.post("/api/channels/:id/test", requireAuth, async (req, res) => {
     await db.read();
     const user = db.forUser(req.walletAddress);
@@ -270,7 +270,7 @@ async function main() {
     if (!mod.isConfigured(creds)) return res.json({ ok: false, reason: "Not configured yet." });
 
     try {
-      const result = mod.test ? await mod.test(creds) : { ok: true };
+      const result = await mod.publish({ text: "✅ Test post from SupraPost — your connection works!", imagePath: null, mode: "text" }, creds);
       res.json(result);
     } catch (err) {
       res.json({ ok: false, reason: err.message });
