@@ -36,4 +36,17 @@ async function publish({ text, imagePath, mode }, creds) {
   }
 }
 
-module.exports = { id: "instagram", isConfigured, publish };
+async function test(creds) {
+  if (!isConfigured(creds)) return { ok: false, reason: "Missing access token or account ID." };
+  try {
+    await axios.get(`https://graph.facebook.com/v19.0/${creds.igUserId}`, {
+      params: { fields: "id,username", access_token: creds.accessToken },
+      timeout: 10000,
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.response?.data?.error?.message || err.message };
+  }
+}
+
+module.exports = { id: "instagram", isConfigured, publish, test };

@@ -50,4 +50,15 @@ async function publish({ text, imagePath, mode }, creds) {
   }
 }
 
-module.exports = { id: "twitter", isConfigured, publish };
+async function test(creds) {
+  if (!isConfigured(creds)) return { ok: false, reason: "Missing API credentials." };
+  try {
+    const client = mkClient(creds);
+    await client.v2.me();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.data?.detail || err.message };
+  }
+}
+
+module.exports = { id: "twitter", isConfigured, publish, test };

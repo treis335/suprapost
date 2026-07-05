@@ -28,4 +28,14 @@ async function publish({ text, imagePath, mode }, creds) {
   }
 }
 
-module.exports = { id: "discord", isConfigured, publish };
+async function test(creds) {
+  if (!isConfigured(creds)) return { ok: false, reason: "Missing webhook URL." };
+  try {
+    await axios.get(creds.webhookUrl, { timeout: 10000 });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.response?.data?.message || err.message };
+  }
+}
+
+module.exports = { id: "discord", isConfigured, publish, test };

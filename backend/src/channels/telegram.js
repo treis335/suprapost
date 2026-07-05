@@ -44,4 +44,17 @@ async function publish({ text, imagePath, mode }, creds) {
   }
 }
 
-module.exports = { id: "telegram", isConfigured, publish };
+async function test(creds) {
+  const { botToken, chatId } = resolveCreds(creds);
+  if (!botToken || !chatId) return { ok: false, reason: "Missing bot token or chat ID." };
+  try {
+    const me = await axios.get(`https://api.telegram.org/bot${botToken}/getMe`, { timeout: 10000 });
+    if (!me.data?.ok) return { ok: false, reason: "Invalid bot token." };
+    await axios.get(`https://api.telegram.org/bot${botToken}/getChat`, { params: { chat_id: chatId }, timeout: 10000 });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.response?.data?.description || err.message };
+  }
+}
+
+module.exports = { id: "telegram", isConfigured, publish, test };

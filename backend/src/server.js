@@ -258,6 +258,25 @@ async function main() {
     res.json(maskChannels(user.channels));
   });
 
+  // Test a channel's saved credentials without publishing anything
+  app.post("/api/channels/:id/test", requireAuth, async (req, res) => {
+    await db.read();
+    const user = db.forUser(req.walletAddress);
+    const { id } = req.params;
+    const mod = require("./channels").registry[id];
+    if (!mod || !user.channels[id]) return res.status(404).json({ ok: false, error: "Unknown channel" });
+
+    const creds = user.channels[id].credentials || {};
+    if (!mod.isConfigured(creds)) return res.json({ ok: false, reason: "Not configured yet." });
+
+    try {
+      const result = mod.test ? await mod.test(creds) : { ok: true };
+      res.json(result);
+    } catch (err) {
+      res.json({ ok: false, reason: err.message });
+    }
+  });
+
   // Publish a manually composed or AI-drafted post
   // body: { text?, imageFilename?, mode, targetIds? }
   //   mode: "text" | "image" | "both"
