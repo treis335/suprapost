@@ -1,16 +1,51 @@
 # SupraPost
 
-**AI-powered social content automation, paid for per post in SUPRA.**
+**AI-powered social media automation, paid for per post in SUPRA.**
 
-SupraPost generates posts with AI (DeepSeek), self-critiques them for
-quality, and publishes automatically — currently to Telegram, with
-Twitter/X and Instagram planned next. The whole engine runs 24/7 on the
-server, completely independent of whether a browser is open or your
-computer is on.
+SupraPost generates posts with AI (DeepSeek for text, ModelsLab for
+images), self-critiques them for quality, and publishes automatically
+to Telegram, Twitter/X, Discord and Instagram. The engine runs 24/7 on
+the server — completely independent of whether a browser is open or
+your computer is on.
 
-You configure your content profile and posting cycle once from the
-dashboard. From then on, the server takes over: it generates, scores,
-charges SUPRA, and publishes on its own schedule.
+You connect your wallet, set up your content profile and channels
+once, then either generate posts manually or turn on Automation and
+let the server take over: it generates, scores, charges SUPRA, and
+publishes on its own schedule.
+
+## Features
+
+- **Wallet-based login** — sign in with your Supra wallet (StarKey),
+  no passwords or emails. Each wallet address is its own isolated
+  account.
+- **AI text generation** — DeepSeek writes the post based on your
+  niche, tone, audience, and example posts; a self-critique step
+  scores it before it goes out.
+- **AI image generation** — ModelsLab generates an image matching the
+  post, in a chosen style, or you can upload your own image instead.
+- **Multi-channel publishing** — Telegram, Twitter/X, Discord and
+  Instagram, each with its own per-user credentials. Toggle any
+  channel on/off; a **Test** button sends a real test post to confirm
+  the connection works.
+- **Manual Compose** — pick text mode (write it yourself or generate
+  with AI), image mode (upload or generate), which channels to post
+  to, a live per-platform preview, and publish with one click.
+- **Automation** — pick a posting interval (30 seconds up to once a
+  day), turn it on, and the backend posts on its own schedule even
+  with the browser closed. The countdown is persisted server-side, so
+  it survives restarts and page reloads.
+- **SUPRA wallet & payments** — real, non-custodial SUPRA deposits via
+  StarKey, plus a simulated top-up mode for local dev. A low-balance
+  banner warns before automation would stall. Every
+  post/generation deducts a fixed SUPRA cost from the balance.
+- **Onboarding checklist** — guides a new user through wallet →
+  content profile → channels → first post.
+- **History** — every generated post with per-channel publish status,
+  plus full deposit history.
+- **Responsive UI** — desktop (sidebar + content + overview rail),
+  tablet, and mobile (bottom tab bar) layouts.
+- **Fully English, non-technical UI** — no API keys, env vars, or
+  backend jargon ever shown to the end user.
 
 ## Architecture
 
@@ -20,21 +55,32 @@ suprapost/
 │   ├── src/
 │   │   ├── auth.js          → wallet sign-in: nonce, Ed25519 verify, JWT
 │   │   ├── channels/        → one publisher module per platform
-│   │   │   ├── index.js     → registry + broadcastToChannels(text, perUserChannels)
-│   │   │   ├── telegram.js  → active, per-user bot token + chat id
-│   │   │   ├── twitter.js   → stub, will use per-user OAuth tokens
-│   │   │   ├── instagram.js → stub, will use per-user OAuth tokens
-│   │   │   └── discord.js   → stub, per-user webhook URL
-│   │   ├── engine.js        → generation + scoring + broadcast cycle (per user)
-│   │   ├── scheduler.js      → 24/7 cron loop, one timer per wallet address
-│   │   ├── deepseek.js       → text generation
-│   │   ├── db.js             → JSON file persistence, keyed by wallet address
-│   │   └── server.js         → Express API + serves the built frontend
+│   │   │   ├── index.js     → registry + publishToChannels(payload, channelsState, targetIds)
+│   │   │   ├── telegram.js  → bot token + chat id, text/image/both
+│   │   │   ├── twitter.js   → OAuth 1.0a user tokens, text/image via twitter-api-v2
+│   │   │   ├── instagram.js → Graph API, needs a public image URL + access token
+│   │   │   └── discord.js   → webhook URL, text/image
+│   │   ├── engine.js        → generation + self-critique + broadcast cycle (per user)
+│   │   ├── scheduler.js     → 24/7 timer loop, one timer per wallet address, persists next-run time
+│   │   ├── deepseek.js      → AI text generation + self-critique scoring
+│   │   ├── imageGen.js      → AI image generation (ModelsLab) + upload handling
+│   │   ├── supraClient.js   → reads on-chain balance / transfers from the Supra RPC
+│   │   ├── deposits.js      → non-custodial deposit intent + confirmation flow
+│   │   ├── db.js            → JSON file persistence, keyed by wallet address
+│   │   └── server.js        → Express API + serves the built frontend
 │   └── data/db.json         → all state lives here (gitignored)
 └── frontend/
     ├── src/
-    │   ├── wallet.js  → StarKey connect + sign-in-with-wallet flow
-    │   └── App.jsx    → dashboard (setup, channels, wallet, history) + login screen
+    │   ├── wallet.js         → StarKey connect + sign-in-with-wallet flow
+    │   ├── payment.js        → StarKey deposit transaction (multi-format fallback)
+    │   ├── theme.js           → design tokens (the "Pulse" design system)
+    │   ├── App.jsx            → main app shell: tabs, layouts, state, all API calls
+    │   ├── components/
+    │   │   ├── ui/            → Card, Btn, Pill, Switch, Inputs, ImagePanel, DepositModal, Misc (checklist, low-balance banner), etc.
+    │   │   ├── layout/        → Sidebar, TopBar, MobileNav, RightPanel
+    │   │   └── channels/      → ChannelCard
+    │   └── pages/             → SetupPage, ChannelsPage, ComposePage, AutomationPage,
+    │                            GeneratePage, HistoryPage, DepositPage
     └── ...
 ```
 
@@ -76,23 +122,39 @@ signature corresponds to the claimed address — tightening this against
 `supra-l1-sdk`'s own address-derivation helper is flagged as a TODO in
 that file, worth doing before this goes anywhere near real funds.
 
+### How deposits work (non-custodial)
+
+1. Frontend requests a deposit intent (`POST /api/wallet/deposit/intent`)
+   for a chosen SUPRA amount — the backend returns the platform's
+   deposit address and a fingerprinted exact amount to send.
+2. The user's StarKey wallet sends that exact amount directly,
+   wallet-to-wallet (`frontend/src/payment.js` tries several StarKey
+   transaction formats until one works).
+3. The frontend sends the resulting transaction hash to
+   `POST /api/wallet/deposit/confirm`; the backend verifies the
+   amount/recipient on-chain via the Supra RPC and credits the
+   internal balance. The unique fingerprinted amount prevents
+   double-crediting.
+4. The backend also polls `SUPRA_DEPOSIT_ADDRESS` every 20s (if set)
+   to catch deposits even if the confirm call never arrives.
+
+Set `ALLOW_SIMULATED_TOPUP=true` in `backend/.env` for local dev to
+add balance without any real transaction, instead of this flow.
+
 ### Adding a new social network
 
 Every channel module exports the same shape:
 
 ```js
-{ id: "platform_name", isConfigured(creds), publish(text, creds) }
+{ id: "platform_name", isConfigured(creds), publish({ text, imagePath, mode }, creds) }
 ```
 
-`creds` is that specific user's credentials for the platform — for
-Telegram/Discord, pasted directly into the Setup → Channels card; for
-Twitter/Instagram (once implemented), per-user OAuth tokens obtained
-through a proper authorization flow. To add a real platform: write a
-new file in `backend/src/channels/`, register it in
-`channels/index.js`, and (for non-OAuth platforms) add its fields to
-`CHANNEL_FIELDS` in `frontend/src/App.jsx`. It automatically shows up
-as a configurable row in the dashboard — no other frontend changes
-needed.
+`creds` is that specific user's credentials for the platform, entered
+in the Channels tab. To add a new platform: write a new file in
+`backend/src/channels/`, register it in `channels/index.js`, and add
+its credential fields to `CHANNEL_INFO` in
+`frontend/src/pages/ChannelsPage.jsx`. It automatically shows up as a
+configurable row in the dashboard.
 
 ## Quick start
 
@@ -109,16 +171,23 @@ cd backend
 cp .env.example .env
 ```
 
-Edit `backend/.env`:
+Edit `backend/.env` — see the file for full comments on each variable:
 
 ```
-DEEPSEEK_API_KEY=sk-...
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
-TELEGRAM_CHAT_ID=987654321
+DEEPSEEK_API_KEY=sk-...              # required for AI text generation
+MODELSLAB_API_KEY=...                # required for AI image generation
+SUPRA_RPC_URL=https://rpc-mainnet.supra.com
+ALLOW_SIMULATED_TOPUP=false          # true = free dev top-ups, no real tx
+SUPRA_DEPOSIT_ADDRESS=...            # your wallet, to receive real deposits
+JWT_SECRET=change-me-to-a-long-random-string
 PORT=3001
 ```
 
-**Finding your `TELEGRAM_CHAT_ID`:**
+Per-channel credentials (Telegram bot token, Discord webhook, Twitter
+API keys, Instagram access token) are entered per-user in the
+**Channels** tab of the app itself — not in `.env`.
+
+**Finding your Telegram chat ID:**
 1. Send any message to your bot on Telegram
 2. Open in your browser: `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
 3. Look for `"chat":{"id": 123456789, ...}` — that number is your chat ID
@@ -140,8 +209,8 @@ You'll land on a wallet sign-in screen. Click "Connect Wallet" — this
 requires the [StarKey browser extension](https://starkey.app) to be
 installed. Approve the connection, then sign the one-time message it
 shows you (this is free — it never costs gas or triggers an on-chain
-transaction). You're then in: Setup, Generate, Automation, History, all
-scoped to your wallet address.
+transaction). You're then in: Setup, Channels, Compose, Automation,
+History, all scoped to your wallet address.
 
 ### Run in development mode (hot reload)
 
@@ -170,10 +239,13 @@ npm run dev:frontend
 When you hit "Start Automation" in the dashboard:
 
 1. The **backend** (not the browser) takes full control
-2. On each cycle (e.g. every 6h), the server independently: charges
-   SUPRA, generates a post via DeepSeek, self-critiques it, and
-   publishes to Telegram
-3. Everything is persisted to `backend/data/db.json`
+2. On each cycle (from every 30 seconds up to once a day, your
+   choice), the server independently: charges SUPRA, generates a
+   post (and optionally an image) via AI, self-critiques it, and
+   publishes to every enabled channel
+3. Everything is persisted to `backend/data/db.json`, including the
+   next-run timestamp — so the "next post in" countdown stays
+   accurate across server restarts and page reloads
 4. If the server restarts while automation was running, it resumes on
    its own (see `server.js`, "Resuming automation")
 5. You can close the browser entirely — as long as the **server keeps
@@ -192,14 +264,21 @@ to a VPS so this runs truly 24/7, independent of your computer.
 | GET | `/api/auth/me` | required | Confirm the current session's wallet address |
 | GET | `/api/settings` | required | Read the content profile |
 | POST | `/api/settings` | required | Update niche, tone, audience, etc. |
+| GET | `/api/wallet` | required | Read SUPRA balance |
+| POST | `/api/wallet/topup` | required | Add balance (dev only, `ALLOW_SIMULATED_TOPUP=true`) |
+| GET | `/api/wallet/deposits` | required | Deposit history |
+| POST | `/api/wallet/deposit/intent` | required | Start a real deposit — returns address + exact amount to send |
+| POST | `/api/wallet/deposit/confirm` | required | Confirm a sent transaction hash and credit the balance |
+| POST | `/api/generate` | required | Generate one post (`{autoPost, mode, imageStyle, ...}`) |
 | GET | `/api/channels` | required | List all platforms and their connected/enabled state |
 | POST | `/api/channels/:id` | required | Toggle a channel and/or save its credentials |
-| GET | `/api/wallet` | required | Read SUPRA balance |
-| POST | `/api/wallet/topup` | required | Add balance (simulated for now) |
-| POST | `/api/generate` | required | Generate one post (`{autoPost: true/false}`) — broadcasts to all enabled channels if `autoPost` is true |
-| POST | `/api/post` | required | Publish a specific text to every enabled channel |
-| GET | `/api/automation` | required | Current automation state |
-| POST | `/api/automation/settings` | required | Set cycle length (seconds) and auto-approve |
+| POST | `/api/channels/:id/test` | required | Send a real test post to that channel |
+| POST | `/api/post` | required | Publish text/image to specific (or all enabled) channels |
+| GET | `/api/image/styles` | public | List available AI image styles |
+| POST | `/api/image/generate` | required | Generate an image for a given post text |
+| POST | `/api/image/upload` | required | Upload your own image instead of generating one |
+| GET | `/api/automation` | required | Current automation state, incl. next run time |
+| POST | `/api/automation/settings` | required | Set cycle length, auto-approve, mode, image style |
 | POST | `/api/automation/start` | required | Start the 24/7 engine for this user |
 | POST | `/api/automation/stop` | required | Stop it |
 | GET | `/api/posts` | required | Post history (each post includes per-channel `results`) |
@@ -212,26 +291,29 @@ from the wallet sign-in flow above.
 
 ## Roadmap
 
-- [x] DeepSeek for text generation
-- [x] Telegram for test publishing
-- [x] 24/7 backend scheduler
+- [x] DeepSeek for text generation + self-critique scoring
+- [x] ModelsLab AI image generation, plus manual upload
+- [x] Telegram, Twitter/X, Discord, Instagram publishing
+- [x] Per-channel "Test" button that sends a real test post
+- [x] 24/7 backend scheduler with persisted countdown (survives restarts/reloads)
 - [x] Frontend + backend unified in one project, one port
 - [x] Multi-channel broadcast architecture (toggle channels on/off, one engine fans out to all of them)
 - [x] Refined responsive design (mobile / tablet / desktop tiers)
 - [x] Wallet-based multi-user auth (StarKey sign-in, no passwords) with per-user data isolation
-- [x] Per-user channel credentials (each user pastes their own Telegram bot / Discord webhook)
+- [x] Per-user channel credentials (each user pastes their own tokens/webhooks)
+- [x] Real, non-custodial SUPRA deposits via StarKey with on-chain confirmation
+- [x] Fully English UI, end-user-facing language only (no technical/config jargon)
+- [x] Onboarding checklist + low-balance banner
+- [x] Per-platform post preview in Compose
 - [ ] Tighten address↔public-key derivation check in auth.js (currently trusts the supplied public key matches the claimed address — fine for local testing, not for production)
-- [ ] Real Twitter/X API v2 integration (OAuth 2.0, per-user tokens) — stub already in place
-- [ ] Real Instagram Graph API integration — stub already in place
-- [ ] Real Discord webhook integration — stub already in place
-- [ ] Real Supra SDK integration (on-chain transactions instead of simulated balance)
 - [ ] Migrate from `data/db.json` to Postgres
 - [ ] Deploy to a VPS (Railway, Render, or self-hosted) for true 24/7 uptime, independent of your own machine, reachable from mobile
 
 ## Tech stack
 
-Node.js · Express · React · Vite · DeepSeek API · Telegram Bot API ·
-Supra blockchain (planned)
+Node.js · Express · React · Vite · DeepSeek API · ModelsLab (image gen) ·
+Telegram Bot API · Twitter API v2 · Discord Webhooks · Instagram
+Graph API · Supra blockchain (StarKey wallet, on-chain deposits)
 
 ## License
 
