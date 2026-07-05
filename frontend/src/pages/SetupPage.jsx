@@ -1,7 +1,7 @@
 import { C, fmt } from "../theme";
-import { Card, Field, Input, Select, TextArea, Btn, ConnStatus } from "../components/ui";
+import { Card, Field, Input, Select, TextArea, Btn } from "../components/ui";
 
-export function SetupPage({ isMobile, backendOk, wallet, topUp, settings, updateSetting, saveSettings }) {
+export function SetupPage({ isMobile, wallet, topUp, settings, updateSetting, saveSettings }) {
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: isMobile ? 16 : 20 }}>
       {!isMobile && (
@@ -11,19 +11,12 @@ export function SetupPage({ isMobile, backendOk, wallet, topUp, settings, update
         </div>
       )}
 
-      <Card eyebrow="Status" title="Connection" right={<ConnStatus ok={backendOk} />}>
-        <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6 }}>
-          {backendOk
-            ? "Connected — all your settings are saved automatically."
-            : "Not connected. Please make sure the SupraPost server is running."}
-        </div>
-      </Card>
 
       <Card eyebrow="Payments" title="SUPRA Wallet" accentTop={C.supra}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
             <div style={{ fontFamily: C.mono, fontSize: "1.7rem", color: C.supra, fontWeight: 600 }}>{fmt(wallet.balance)} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span></div>
-            <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 4 }}>Cost per post: {fmt(wallet.costPerPost)} SUPRA · simulated for now</div>
+            <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 4 }}>{fmt(wallet.costPerPost)} SUPRA por publicação</div>
           </div>
           <Btn variant="supra" onClick={() => topUp(10)}>+ 10 SUPRA</Btn>
         </div>

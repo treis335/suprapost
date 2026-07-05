@@ -749,7 +749,7 @@ export default function App() {
         <div style={{ height: 1, background: C.border, marginBottom: 16 }} />
         <TopUpFlow walletAddress={session?.address} onCredited={refreshAll} />
         <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 14, lineHeight: 1.6 }}>
-          Non-custodial — you sign the transfer from your own wallet. We never hold your private key.
+          O teu saldo fica guardado na plataforma e é debitado por cada publicação.
         </div>
       </Card>
 

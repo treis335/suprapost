@@ -53,7 +53,6 @@ export function AutomationPage({
             disabled={automation.running}
             style={{ marginBottom: 13 }}
           >
-            <option value={30}>30 seconds (test)</option>
             <option value={3600}>1 hour</option>
             <option value={10800}>3 hours</option>
             <option value={21600}>6 hours</option>
