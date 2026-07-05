@@ -832,6 +832,12 @@ export default function App() {
         <Card eyebrow="Schedule" title="Cycle Settings">
           <Field label="Post every">
             <Select value={automation.cycleSeconds} onChange={e => saveAutomationSettings({ cycleSeconds: Number(e.target.value) })} disabled={automation.running}>
+              <option value={30}>30 seconds</option>
+              <option value={60}>1 minute</option>
+              <option value={300}>5 minutes</option>
+              <option value={600}>10 minutes</option>
+              <option value={900}>15 minutes</option>
+              <option value={1800}>30 minutes</option>
               <option value={3600}>1 hour</option>
               <option value={10800}>3 hours</option>
               <option value={21600}>6 hours</option>
