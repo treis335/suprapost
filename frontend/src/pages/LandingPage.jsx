@@ -151,6 +151,23 @@ function useDemo() {
   return { niche, setNiche, phase, typed, score, run };
 }
 
+function AIImageThumb({ colors, seed = 0 }) {
+  const id = `g${seed}`;
+  return (
+    <svg width="100%" height="130" viewBox="0 0 300 130" style={{ display: "block", borderRadius: 10 }}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={colors[0]} />
+          <stop offset="100%" stopColor={colors[1]} />
+        </linearGradient>
+      </defs>
+      <rect width="300" height="130" fill={`url(#${id})`} opacity="0.85" />
+      <circle cx={70 + seed * 30} cy="40" r="55" fill={colors[1]} opacity="0.25" />
+      <circle cx={220 - seed * 20} cy="90" r="70" fill={colors[0]} opacity="0.2" />
+    </svg>
+  );
+}
+
 function LiveDemo() {
   const { niche, setNiche, phase, typed, score, run } = useDemo();
   const busy = phase !== "idle" && phase !== "done";
@@ -226,9 +243,14 @@ function LiveDemo() {
 }
 
 const EXAMPLE_POSTS = [
-  { platform: "telegram", tag: "✈ Telegram", text: "Stop trading noise. Start building signal. Supra fundamentals have never been stronger — on-chain data doesn't lie. 📈" },
-  { platform: "twitter", tag: "𝕏 X", text: "GM builders ☀️ Shipping is the only alpha. What are you building on Supra this week?" },
-  { platform: "discord", tag: "🎮 Discord", text: "New week, new milestones. The roadmap update is live in #announcements — feedback welcome!" },
+  { platform: "telegram", tag: "Telegram", handle: "Supra Alpha", time: "2m", color: "#34b7eb", initial: "S",
+    text: "Stop trading noise. Start building signal. Supra fundamentals have never been stronger — on-chain data doesn't lie. 📈",
+    image: [C.accent, C.accent2] },
+  { platform: "twitter", tag: "X", handle: "@supraalpha", time: "5m", color: "#e7e9ea", initial: "S",
+    text: "GM builders ☀️ Shipping is the only alpha. What are you building on Supra this week?", image: null },
+  { platform: "discord", tag: "Discord", handle: "supra-updates", time: "12m", color: "#5865F2", initial: "S",
+    text: "New week, new milestones. The roadmap update is live in #announcements — feedback welcome!",
+    image: [C.supra, C.accent2] },
 ];
 
 export function LandingPage({ onEnter }) {
@@ -407,14 +429,33 @@ export function LandingPage({ onEnter }) {
         <Section style={{ padding: "0 24px 90px" }}>
           <Reveal>
             <div style={{ fontFamily: C.mono, fontSize: "0.7rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>Examples</div>
-            <h2 style={{ fontFamily: C.display, fontSize: "1.7rem", fontWeight: 600, margin: "0 0 28px", letterSpacing: "-0.015em" }}>What the AI actually writes.</h2>
+            <h2 style={{ fontFamily: C.display, fontSize: "1.7rem", fontWeight: 600, margin: "0 0 28px", letterSpacing: "-0.015em" }}>What actually goes out.</h2>
           </Reveal>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 18 }}>
             {EXAMPLE_POSTS.map((p, idx) => (
-              <Reveal key={p.tag} delay={idx * 0.08}>
-                <div className="feature-card" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 22, height: "100%", boxSizing: "border-box" }}>
-                  <div style={{ fontSize: "0.72rem", color: C.muted, fontWeight: 600, marginBottom: 12 }}>{p.tag}</div>
-                  <div style={{ fontSize: "0.9rem", color: C.text, lineHeight: 1.6 }}>{p.text}</div>
+              <Reveal key={p.handle} delay={idx * 0.08}>
+                <div className="feature-card" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18, height: "100%", boxSizing: "border-box" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                    <div style={{
+                      width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(135deg, ${p.color}, ${C.accent2})`,
+                      display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: "0.85rem", flexShrink: 0,
+                    }}>{p.initial}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 600, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.handle}</div>
+                      <div style={{ fontSize: "0.72rem", color: C.muted }}>{p.tag} · {p.time}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.58, marginBottom: p.image ? 12 : 14 }}>{p.text}</div>
+                  {p.image && (
+                    <div style={{ marginBottom: 14 }}>
+                      <AIImageThumb colors={p.image} seed={idx} />
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 18, fontSize: "0.76rem", color: C.muted, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+                    <span>♡ {12 + idx * 7}</span>
+                    <span>↻ {3 + idx}</span>
+                    <span>⤴ share</span>
+                  </div>
                 </div>
               </Reveal>
             ))}
