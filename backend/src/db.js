@@ -96,7 +96,9 @@ class JsonDB {
    * db.write() after if you mutate the result.
    */
   forUser(address) {
-    const key = address.toLowerCase();
+    // Normalise: always strip 0x prefix and lowercase — consistent with auth.js
+    const raw = String(address || "").trim();
+    const key = (raw.startsWith("0x") ? raw.slice(2) : raw).toLowerCase();
     if (!this.data.users[key]) {
       this.data.users[key] = freshUserData();
     }
@@ -105,6 +107,44 @@ class JsonDB {
 }
 
 const db = new JsonDB(file, defaultData);
+
+// ── Migration: normalise user keys (strip 0x prefix if present) ─────────
+// Runs once at startup. Safe to run multiple times — idempotent.
+(async () => {
+  try {
+    await db.read();
+    const users = db.data.users || {};
+    let migrated = 0;
+    for (const key of Object.keys(users)) {
+      if (key.startsWith("0x")) {
+        const newKey = key.slice(2).toLowerCase();
+        if (!users[newKey]) {
+          users[newKey] = users[key];
+        } else {
+          // Merge: keep higher balance
+          users[newKey].wallet = users[newKey].wallet || {};
+          users[newKey].wallet.balance = Math.max(
+            users[newKey].wallet?.balance || 0,
+            users[key].wallet?.balance || 0
+          );
+          users[newKey].wallet.deposits = [
+            ...(users[newKey].wallet?.deposits || []),
+            ...(users[key].wallet?.deposits || []),
+          ];
+        }
+        delete users[key];
+        migrated++;
+      }
+    }
+    if (migrated > 0) {
+      db.data.users = users;
+      await db.write();
+      console.log(`[db] Migrated ${migrated} user key(s) to normalised format (no 0x prefix).`);
+    }
+  } catch (e) {
+    console.error("[db] Migration error:", e.message);
+  }
+})();
 
 /**
  * Merges saved data on top of fresh defaults, one level deep, so that
