@@ -95,6 +95,136 @@ const CONSOLE_LINES = [
   { t: "… next cycle in 00:29:41", c: "muted" },
 ];
 
+const DEMO_TEMPLATES = [
+  "Stop scrolling past {niche}. The fundamentals here have never been stronger — this is signal, not noise.",
+  "Everyone's talking about {niche}. Here's the part they're skipping: consistency beats hype, every single cycle.",
+  "Quick thought on {niche}: the builders who ship quietly this quarter win the next one. Keep building.",
+  "{niche} update: on-chain data doesn't lie. Watch the fundamentals, not the timeline.",
+];
+
+function useDemo() {
+  const [niche, setNiche] = useState("DeFi trading");
+  const [phase, setPhase] = useState("idle"); // idle → writing → scoring → posting → done
+  const [typed, setTyped] = useState("");
+  const [score, setScore] = useState(0);
+  const timers = useRef([]);
+
+  function clearTimers() { timers.current.forEach(clearTimeout); timers.current = []; }
+
+  function run() {
+    clearTimers();
+    const text = DEMO_TEMPLATES[Math.floor(Math.random() * DEMO_TEMPLATES.length)].replace("{niche}", niche || "your niche");
+    setTyped(""); setScore(0); setPhase("writing");
+
+    let i = 0;
+    const typeStep = () => {
+      i++;
+      setTyped(text.slice(0, i));
+      if (i < text.length) timers.current.push(setTimeout(typeStep, 14));
+      else timers.current.push(setTimeout(() => setPhase("scoring"), 300));
+    };
+    timers.current.push(setTimeout(typeStep, 250));
+  }
+
+  useEffect(() => {
+    if (phase !== "scoring") return;
+    const target = 8 + Math.random() * 1.6;
+    let s = 0;
+    const step = () => {
+      s = Math.min(target, s + target / 20);
+      setScore(s);
+      if (s < target) timers.current.push(setTimeout(step, 30));
+      else timers.current.push(setTimeout(() => setPhase("posting"), 400));
+    };
+    step();
+    return clearTimers;
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "posting") return;
+    timers.current.push(setTimeout(() => setPhase("done"), 900));
+    return clearTimers;
+  }, [phase]);
+
+  useEffect(() => () => clearTimers(), []);
+
+  return { niche, setNiche, phase, typed, score, run };
+}
+
+function LiveDemo() {
+  const { niche, setNiche, phase, typed, score, run } = useDemo();
+  const busy = phase !== "idle" && phase !== "done";
+
+  return (
+    <div style={{
+      background: `linear-gradient(180deg, ${C.surface2}, ${C.surface})`, border: `1px solid ${C.border}`,
+      borderRadius: 22, padding: "28px 26px", boxShadow: "0 30px 60px -32px rgba(0,0,0,0.6)",
+    }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 22 }}>
+        <input
+          value={niche} onChange={e => setNiche(e.target.value)} placeholder="Type your niche… e.g. DeFi trading"
+          style={{
+            flex: 1, minWidth: 200, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 11,
+            color: C.text, fontFamily: C.sans, fontSize: "0.88rem", padding: "12px 14px", outline: "none",
+          }}
+        />
+        <Btn variant="primary" onClick={run} disabled={busy}>{busy ? "Generating…" : "▶ Try it live"}</Btn>
+      </div>
+
+      <div style={{ minHeight: 210 }}>
+        {phase === "idle" && (
+          <div style={{ fontSize: "0.86rem", color: C.muted, padding: "30px 4px" }}>
+            Type any niche above and watch the AI draft, score, and publish a post — right here.
+          </div>
+        )}
+
+        {phase !== "idle" && (
+          <div>
+            <div style={{ fontSize: "0.72rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Draft</div>
+            <div style={{
+              fontFamily: C.mono, fontSize: "0.92rem", color: C.text, lineHeight: 1.65, minHeight: 60,
+              background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px",
+            }}>
+              {typed}{phase === "writing" && <span style={{ opacity: 0.6 }}>▌</span>}
+            </div>
+
+            {(phase === "scoring" || phase === "posting" || phase === "done") && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: C.muted, marginBottom: 6 }}>
+                  <span>SELF-CRITIQUE SCORE</span><span style={{ fontFamily: C.mono, color: C.supra }}>{score.toFixed(1)}/10</span>
+                </div>
+                <div style={{ height: 6, borderRadius: 3, background: C.border, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${score * 10}%`, background: `linear-gradient(90deg, ${C.accent}, ${C.supra})`, transition: "width 0.05s linear" }} />
+                </div>
+              </div>
+            )}
+
+            {(phase === "posting" || phase === "done") && (
+              <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+                {PLATFORMS.slice(0, 3).map((p, idx) => (
+                  <div key={p.id} style={{
+                    display: "flex", alignItems: "center", gap: 7, padding: "8px 13px", borderRadius: 999,
+                    background: `${p.color}18`, border: `1px solid ${p.color}44`, fontSize: "0.78rem", color: C.text,
+                    opacity: phase === "done" || true ? 1 : 0,
+                    animation: `fu 0.4s cubic-bezier(.16,1,.3,1) ${idx * 0.15}s both`,
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill={p.color}><path d={p.path} /></svg>
+                    {phase === "done" ? "Published" : "Posting…"}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {phase === "done" && (
+              <div style={{ marginTop: 16, fontFamily: C.mono, fontSize: "0.8rem", color: C.warn }}>− 1.00 SUPRA charged</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const EXAMPLE_POSTS = [
   { platform: "telegram", tag: "✈ Telegram", text: "Stop trading noise. Start building signal. Supra fundamentals have never been stronger — on-chain data doesn't lie. 📈" },
   { platform: "twitter", tag: "𝕏 X", text: "GM builders ☀️ Shipping is the only alpha. What are you building on Supra this week?" },
@@ -114,6 +244,7 @@ export function LandingPage({ onEnter }) {
   return (
     <div style={{ background: C.bg, color: C.text, fontFamily: C.sans, minHeight: "100vh", overflowX: "hidden" }}>
       <style>{`
+        @keyframes fu { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes floatBlob { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-3%,4%) scale(1.06); } }
         @keyframes floatBlob2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(4%,-3%) scale(1.08); } }
         .glow-blob-a { animation: floatBlob 16s ease-in-out infinite; }
@@ -260,23 +391,14 @@ export function LandingPage({ onEnter }) {
           </div>
         </Section>
 
-        {/* ── Live console ────────────────────────────────────── */}
+        {/* ── Interactive demo ────────────────────────────────── */}
         <Section style={{ padding: "0 24px 90px" }}>
           <Reveal>
-            <div style={{ fontFamily: C.mono, fontSize: "0.7rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>What's happening under the hood</div>
-            <h2 style={{ fontFamily: C.display, fontSize: "1.7rem", fontWeight: 600, margin: "0 0 28px", letterSpacing: "-0.015em" }}>One cycle, start to finish.</h2>
-            <div style={{
-              background: "#0a0d14", border: `1px solid ${C.border}`, borderRadius: 16, padding: "20px 24px",
-              boxShadow: "0 24px 50px -28px rgba(0,0,0,0.6)", maxWidth: 640,
-            }}>
-              <div style={{ display: "flex", gap: 7, marginBottom: 16 }}>
-                <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#ff5f56" }} />
-                <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#ffbd2e" }} />
-                <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#27c93f" }} />
-              </div>
-              {CONSOLE_LINES.map((l, i) => (
-                <div key={i} style={{ fontFamily: C.mono, fontSize: "0.83rem", color: C[l.c] || C.text2, lineHeight: 1.9 }}>{l.t}</div>
-              ))}
+            <div style={{ fontFamily: C.mono, fontSize: "0.7rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>Try it yourself</div>
+            <h2 style={{ fontFamily: C.display, fontSize: "1.9rem", fontWeight: 600, margin: "0 0 10px", letterSpacing: "-0.015em" }}>Don't take our word for it.</h2>
+            <p style={{ color: C.text2, marginBottom: 28, maxWidth: 560 }}>Type a niche, hit generate, and watch a full cycle play out — draft, score, publish — the same one that runs on your account 24/7.</p>
+            <div style={{ maxWidth: 640 }}>
+              <LiveDemo />
             </div>
           </Reveal>
         </Section>
