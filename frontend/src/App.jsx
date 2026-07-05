@@ -295,7 +295,7 @@ const CHANNEL_ICONS = { telegram: "✈", twitter: "𝕏", instagram: "◫", disc
 
 /* ── Low Balance Banner ──────────────────────────────────────────────────── */
 function LowBalanceBanner({ balance, costPerPost, onDeposit }) {
-  if (balance > costPerPost * 5) return null;
+  if (balance > costPerPost * 3) return null;
   const critical = balance < costPerPost;
   const postsLeft = Math.floor(balance / costPerPost);
   const color = critical ? C.danger : C.warn;
