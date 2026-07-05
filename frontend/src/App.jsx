@@ -3,6 +3,7 @@ import { C } from "./theme";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 import { ComposePage } from "./pages/ComposePage";
 import { ChannelsPanel } from "./pages/ChannelsPage";
+import { LandingPage } from "./pages/LandingPage";
 import { depositSupra } from "./payment";
 
 const TABS = [
@@ -704,6 +705,7 @@ export default function App() {
   const isCompact = isMobile || isTablet;
   const [tab, setTab] = useState("setup");
   const [session, setSession] = useState(() => getSession());
+  const [showLanding, setShowLanding] = useState(() => !getSession());
 
   const [settings, setSettings] = useState({ niche: "", tone: "technical", audience: "", examples: "", avoid: "", postType: "alpha", customPrompt: "" });
   const [channels, setChannels] = useState([]);
@@ -1054,6 +1056,7 @@ export default function App() {
 
   const panels = { setup: Setup, channels: Channels, compose: Generate, automation: Automation, history: History };
 
+  if (showLanding && !session) return <LandingPage onEnter={() => setShowLanding(false)} />;
   if (!session) return <LoginScreen onSignedIn={setSession} isMobile={isMobile} />;
 
   /* ── Layouts ─────────────────────────────────────────────────────────── */
