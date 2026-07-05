@@ -663,7 +663,7 @@ export default function App() {
   async function onSaveChannel(id, values) {
     try {
       const updated = await api.post(`/channels/${id}`, values);
-      setChannels(prev => prev.map(c => c.id === id ? updated : c));
+      setChannels(Array.isArray(updated) ? updated : Object.values(updated || {}));
     } catch {}
   }
 
