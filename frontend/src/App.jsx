@@ -295,27 +295,45 @@ const CHANNEL_ICONS = { telegram: "✈", twitter: "𝕏", instagram: "◫", disc
 
 /* ── Low Balance Banner ──────────────────────────────────────────────────── */
 function LowBalanceBanner({ balance, costPerPost, onDeposit }) {
-  if (balance > costPerPost * 3) return null;
+  if (balance > costPerPost * 5) return null;
   const critical = balance < costPerPost;
+  const postsLeft = Math.floor(balance / costPerPost);
+  const color = critical ? C.danger : C.warn;
   return (
     <div className="fade-up" style={{
-      background: critical ? `${C.danger}14` : `${C.warn}14`,
-      border: `1px solid ${critical ? C.danger : C.warn}44`,
-      borderRadius: 12, padding: "12px 16px",
+      background: critical ? `${C.danger}10` : `${C.warn}10`,
+      borderBottom: `1px solid ${color}33`,
+      padding: "9px 20px",
       display: "flex", alignItems: "center", justifyContent: "space-between",
       gap: 12, flexWrap: "wrap",
+      position: "sticky", top: 0, zIndex: 110,
+      backdropFilter: "blur(10px)",
     }}>
-      <div>
-        <div style={{ fontSize: "0.8rem", fontWeight: 600, color: critical ? C.danger : C.warn }}>
-          {critical ? "⚠ Insufficient balance — automation paused" : "⚠ Low balance — top up soon"}
-        </div>
-        <div style={{ fontSize: "0.72rem", color: C.muted, marginTop: 3 }}>
-          {fmt(balance)} SUPRA remaining · {fmt(costPerPost)} SUPRA per post
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: "0.9rem" }}>{critical ? "⛔" : "⚠️"}</span>
+        <div>
+          <span style={{ fontSize: "0.78rem", fontWeight: 600, color }}>
+            {critical
+              ? "Insufficient balance — automation has stopped"
+              : `Low balance — ${postsLeft} post${postsLeft !== 1 ? "s" : ""} remaining`}
+          </span>
+          <span style={{ fontSize: "0.74rem", color: C.muted, marginLeft: 8 }}>
+            {fmt(balance)} SUPRA
+          </span>
         </div>
       </div>
-      <Btn variant={critical ? "danger" : "warn"} size="sm" onClick={onDeposit}>
-        Add SUPRA →
-      </Btn>
+      <button onClick={onDeposit} style={{
+        all: "unset", cursor: "pointer",
+        padding: "5px 14px", borderRadius: 8,
+        fontSize: "0.76rem", fontWeight: 700,
+        background: color, color: critical ? "#fff" : "#1a0a00",
+        transition: "filter 0.15s",
+      }}
+        onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.12)"}
+        onMouseLeave={e => e.currentTarget.style.filter = "none"}
+      >
+        Deposit SUPRA →
+      </button>
     </div>
   );
 }
@@ -728,11 +746,6 @@ export default function App() {
         onNavigate={setTab}
       />
 
-      <LowBalanceBanner
-        balance={wallet.balance} costPerPost={wallet.costPerPost}
-        onDeposit={() => document.getElementById("deposit-section")?.scrollIntoView({ behavior: "smooth" })}
-      />
-
       <Card eyebrow="Identity" title="Account" accentTop={C.accent2}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
@@ -805,7 +818,6 @@ export default function App() {
         </div>
       )}
 
-      <LowBalanceBanner balance={wallet.balance} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
 
       <Card style={{ textAlign: "center", padding: isMobile ? "28px 20px" : "36px 20px" }} accentTop={automation.running ? C.accent : undefined}>
         <OrbitRing progress={progress} running={automation.running} size={isMobile ? 150 : 188}
@@ -954,6 +966,7 @@ export default function App() {
       <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans }}>
         <GlobalStyle />
         {toastEl}
+        <LowBalanceBanner balance={wallet.balance} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.85)", backdropFilter: "blur(10px)", position: "sticky", top: 0, zIndex: 100 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: "1.1rem", fontFamily: C.display }}>Supra<span style={{ color: C.accent }}>Post</span></div>
@@ -983,6 +996,7 @@ export default function App() {
       <div style={{ background: C.bgGrad, color: C.text, minHeight: "100vh", fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
         <GlobalStyle />
         {toastEl}
+        <LowBalanceBanner balance={wallet.balance} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.7)", backdropFilter: "blur(10px)" }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: "1.15rem", fontFamily: C.display }}>Supra<span style={{ color: C.accent }}>Post</span></div>
@@ -1010,6 +1024,7 @@ export default function App() {
     <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
       <GlobalStyle />
       {toastEl}
+      <LowBalanceBanner balance={wallet.balance} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 32px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.6)", backdropFilter: "blur(10px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ fontWeight: 700, fontSize: "1.25rem", fontFamily: C.display, letterSpacing: "-0.01em" }}>Supra<span style={{ color: C.accent }}>Post</span></div>
