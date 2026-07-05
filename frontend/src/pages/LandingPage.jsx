@@ -489,6 +489,32 @@ export function LandingPage({ onEnter }) {
           </div>
         </Section>
 
+        {/* ── Before / after ──────────────────────────────────── */}
+        <Section style={{ padding: "0 24px 90px" }}>
+          <Reveal>
+            <div style={{ fontFamily: C.mono, fontSize: "0.7rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>The difference</div>
+            <h2 style={{ fontFamily: C.display, fontSize: "1.9rem", fontWeight: 600, margin: "0 0 28px", letterSpacing: "-0.015em" }}>What you stop doing.</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18 }}>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: 26 }}>
+                <div style={{ fontSize: "0.72rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>Doing it manually</div>
+                {["Write a post for every platform, every day", "Design or find an image for each one", "Log in and publish to each app separately", "Remember to do it again tomorrow"].map(t => (
+                  <div key={t} style={{ display: "flex", gap: 10, fontSize: "0.88rem", color: C.text2, padding: "9px 0", borderTop: `1px solid ${C.border}` }}>
+                    <span style={{ color: C.danger }}>✕</span>{t}
+                  </div>
+                ))}
+              </div>
+              <div style={{ background: `linear-gradient(180deg, ${C.surface2}, ${C.surface})`, border: `1px solid ${C.accent}44`, borderRadius: 18, padding: 26, boxShadow: `0 20px 50px -30px ${C.accent}55` }}>
+                <div style={{ fontSize: "0.72rem", color: C.accent, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>With SupraPost</div>
+                {["Set your profile and channels once", "AI writes and illustrates every post", "One engine publishes everywhere at once", "It keeps going without you, forever"].map(t => (
+                  <div key={t} style={{ display: "flex", gap: 10, fontSize: "0.88rem", color: C.text, padding: "9px 0", borderTop: `1px solid ${C.border}` }}>
+                    <span style={{ color: C.supra }}>✓</span>{t}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+        </Section>
+
         <Section style={{ padding: "0 24px 100px" }}>
           <Reveal>
             <div style={{
