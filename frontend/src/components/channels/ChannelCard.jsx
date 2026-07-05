@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { C } from "../../theme";
-import { Btn, Card, Field, Input, Pill, Switch } from "../ui";
+import { Btn, Card, Field, Input, Switch } from "../ui";
 
-/**
- * Channel card — always shows credential fields, no expand/collapse bug.
- * State is kept locally; saving writes to backend and updates parent.
- */
 export function ChannelCard({ channel, onSave, onTest }) {
   const [values, setValues]       = useState(channel.values ?? {});
   const [enabled, setEnabled]     = useState(channel.enabled ?? false);
@@ -13,9 +9,8 @@ export function ChannelCard({ channel, onSave, onTest }) {
   const [saving, setSaving]       = useState(false);
   const [testing, setTesting]     = useState(false);
   const [testResult, setTestResult] = useState(null);
-  const [showFields, setShowFields] = useState(false);
+  const [saved, setSaved]         = useState(false);
 
-  // Sync when parent pushes new channel data (e.g. after save)
   useEffect(() => {
     setValues(channel.values ?? {});
     setEnabled(channel.enabled ?? false);
@@ -26,6 +21,7 @@ export function ChannelCard({ channel, onSave, onTest }) {
     setValues((v) => ({ ...v, [key]: val }));
     setDirty(true);
     setTestResult(null);
+    setSaved(false);
   }
 
   function handleToggle(next) {
@@ -39,7 +35,8 @@ export function ChannelCard({ channel, onSave, onTest }) {
     await onSave(channel.id, { ...values, enabled });
     setSaving(false);
     setDirty(false);
-    setShowFields(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
   }
 
   async function handleTest() {
@@ -53,31 +50,26 @@ export function ChannelCard({ channel, onSave, onTest }) {
 
   const isActive     = channel.configured && enabled;
   const isPaused     = channel.configured && !enabled;
-  const isNew        = !channel.configured;
   const isComingSoon = channel.comingSoon;
-
-  const statusColor = isActive ? C.supra : isPaused ? C.warn : C.muted;
-  const statusLabel = isComingSoon ? "Coming soon"
-    : isActive  ? "Active"
-    : isPaused  ? "Paused"
-    : "Not connected";
+  const statusColor  = isActive ? C.supra : isPaused ? C.warn : C.muted;
+  const statusLabel  = isComingSoon ? "Em breve" : isActive ? "Ativo" : isPaused ? "Pausado" : "Por configurar";
 
   return (
     <Card
       accentTop={isActive ? channel.color : undefined}
-      style={{ opacity: isComingSoon ? 0.55 : 1, display: "flex", flexDirection: "column", gap: 0 }}
+      style={{ opacity: isComingSoon ? 0.5 : 1, display: "flex", flexDirection: "column", gap: 0 }}
     >
-      {/* ── Header ────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 16 }}>
+      {/* ── Header ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: channel.fields?.length ? 18 : 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
-            width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-            background: `${channel.color}18`,
-            border: `1.5px solid ${isActive ? channel.color + "66" : channel.color + "28"}`,
+            width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+            background: `${channel.color}15`,
+            border: `1.5px solid ${isActive ? channel.color + "66" : channel.color + "25"}`,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "1.2rem",
-            boxShadow: isActive ? `0 0 14px -4px ${channel.color}55` : "none",
-            transition: "box-shadow 0.3s",
+            fontSize: "1.25rem",
+            boxShadow: isActive ? `0 0 18px -6px ${channel.color}66` : "none",
+            transition: "all 0.3s",
           }}>{channel.icon}</div>
           <div>
             <div style={{ fontWeight: 700, fontFamily: C.display, fontSize: "1rem", letterSpacing: "-0.01em" }}>
@@ -94,127 +86,94 @@ export function ChannelCard({ channel, onSave, onTest }) {
             </div>
           </div>
         </div>
-        {!isComingSoon && (
+        {!isComingSoon && channel.fields?.length > 0 && (
           <Switch checked={enabled} onChange={handleToggle} />
         )}
       </div>
 
-      {/* ── Description ───────────────────────────────────── */}
-      {channel.description && (
-        <div style={{ fontSize: "0.78rem", color: C.text2, lineHeight: 1.6, marginBottom: 16 }}>
-          {channel.description}
+      {/* ── Coming soon ── */}
+      {isComingSoon && (
+        <div style={{ fontSize: "0.78rem", color: C.muted, lineHeight: 1.6 }}>
+          Integração disponível em breve.
         </div>
       )}
 
-      {/* ── Credentials section ───────────────────────────── */}
+      {/* ── Credential fields — always visible ── */}
       {!isComingSoon && channel.fields?.length > 0 && (
-        <>
-          {/* Divider + toggle */}
-          <button
-            onClick={() => setShowFields((s) => !s)}
-            style={{
-              all: "unset", cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "10px 0",
-              borderTop: `1px solid ${C.border}`,
-              fontSize: "0.75rem", color: showFields ? C.accent : C.text2,
-              fontWeight: 600, letterSpacing: "0.02em",
-              transition: "color 0.2s",
-              userSelect: "none",
-            }}
-          >
-            <span style={{
-              display: "inline-flex", alignItems: "center", justifyContent: "center",
-              width: 18, height: 18, borderRadius: 5,
-              background: showFields ? `${C.accent}22` : C.raised,
-              border: `1px solid ${showFields ? C.accent + "55" : C.border}`,
-              fontSize: "0.6rem", color: showFields ? C.accent : C.muted,
-              transition: "all 0.2s", flexShrink: 0,
-            }}>
-              {showFields ? "▲" : "▼"}
-            </span>
-            {channel.configured ? "Update credentials" : "Set up connection"}
-          </button>
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 2 }}>
 
-          {showFields && (
-            <div style={{ paddingTop: 14, display: "flex", flexDirection: "column", gap: 2 }}>
-              {channel.fields.map((f) => (
-                <Field key={f.key} label={f.label}>
-                  <Input
-                    type={f.type === "password" ? "password" : "text"}
-                    placeholder={f.placeholder || ""}
-                    value={values[f.key] ?? ""}
-                    onChange={(e) => setField(f.key, e.target.value)}
-                  />
-                </Field>
-              ))}
+          {/* Section label */}
+          <div style={{ fontSize: "0.68rem", color: C.muted, fontFamily: C.mono, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8 }}>
+            {channel.configured ? "Credenciais" : "Configurar ligação"}
+          </div>
 
-              {/* Help link */}
-              {channel.helpUrl && (
-                <a
-                  href={channel.helpUrl}
-                  target="_blank"
-                  rel="noreferrer"
+          {channel.fields.map((f) => (
+            <Field key={f.key} label={f.label}>
+              <div style={{ position: "relative" }}>
+                <Input
+                  type={f.type === "password" ? "password" : "text"}
+                  placeholder={f.placeholder || ""}
+                  value={values[f.key] ?? ""}
+                  onChange={(e) => setField(f.key, e.target.value)}
                   style={{
-                    fontSize: "0.72rem", color: C.accent2, textDecoration: "none",
-                    display: "inline-flex", alignItems: "center", gap: 4,
-                    marginBottom: 14, alignSelf: "flex-start",
-                    opacity: 0.85,
+                    paddingRight: values[f.key] ? 36 : 12,
+                    borderColor: values[f.key] ? `${channel.color}55` : undefined,
                   }}
-                >
-                  Where do I find these? ↗
-                </a>
-              )}
-
-              {/* Actions */}
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <Btn
-                  variant="primary"
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={!dirty || saving}
-                >
-                  {saving ? "Saving…" : "Save"}
-                </Btn>
-                <Btn
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleTest}
-                  disabled={testing || (!channel.configured && !dirty)}
-                >
-                  {testing ? "Testing…" : "Test"}
-                </Btn>
+                />
+                {/* indicator — campo preenchido */}
+                {values[f.key] && (
+                  <span style={{
+                    position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                    fontSize: "0.7rem", color: C.supra, pointerEvents: "none",
+                  }}>✓</span>
+                )}
               </div>
+            </Field>
+          ))}
 
-              {/* Test result */}
-              {testResult && (
-                <div
-                  className="fade-up"
-                  style={{
-                    marginTop: 10,
-                    fontSize: "0.75rem", padding: "9px 13px", borderRadius: 8, lineHeight: 1.5,
-                    background: testResult.ok ? `${C.supra}14` : `${C.danger}14`,
-                    border: `1px solid ${testResult.ok ? C.supra : C.danger}44`,
-                    color: testResult.ok ? C.supra : C.danger,
-                  }}
-                >
-                  {testResult.ok
-                    ? "✓ Connection successful."
-                    : `✕ ${testResult.error || testResult.reason || "Connection failed — check your credentials."}`}
-                </div>
-              )}
+          {/* Help link */}
+          {channel.helpUrl && (
+            <a href={channel.helpUrl} target="_blank" rel="noreferrer" style={{
+              fontSize: "0.72rem", color: C.accent2, textDecoration: "none",
+              display: "inline-flex", alignItems: "center", gap: 4,
+              marginBottom: 14, alignSelf: "flex-start", opacity: 0.85,
+            }}>
+              Onde encontro estas credenciais? ↗
+            </a>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+            <Btn
+              variant="primary" size="sm"
+              onClick={handleSave}
+              disabled={!dirty || saving}
+            >
+              {saving ? "A guardar…" : saved ? "✓ Guardado" : "Guardar"}
+            </Btn>
+            <Btn
+              variant="ghost" size="sm"
+              onClick={handleTest}
+              disabled={testing || (!channel.configured && !dirty)}
+            >
+              {testing ? "A testar…" : "Testar ligação"}
+            </Btn>
+          </div>
+
+          {/* Test result */}
+          {testResult && (
+            <div className="fade-up" style={{
+              marginTop: 10, fontSize: "0.75rem", padding: "9px 13px",
+              borderRadius: 8, lineHeight: 1.5,
+              background: testResult.ok ? `${C.supra}14` : `${C.danger}14`,
+              border: `1px solid ${testResult.ok ? C.supra : C.danger}44`,
+              color: testResult.ok ? C.supra : C.danger,
+            }}>
+              {testResult.ok
+                ? "✓ Ligação bem-sucedida."
+                : `✕ ${testResult.error || testResult.reason || "Falha na ligação — verifica as credenciais."}`}
             </div>
           )}
-        </>
-      )}
-
-      {/* Coming soon overlay message */}
-      {isComingSoon && (
-        <div style={{
-          borderTop: `1px solid ${C.border}`, paddingTop: 12, marginTop: 4,
-          fontSize: "0.74rem", color: C.muted,
-        }}>
-          Integration coming soon.
         </div>
       )}
     </Card>
