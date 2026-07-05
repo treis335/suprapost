@@ -76,3 +76,122 @@ export function StatTile({ label, value, color, suffix }) {
 export function ConnStatus({ ok }) {
   return <Pill color={ok ? C.supra : C.danger} dot pulse={ok}>{ok ? "server online" : "server offline"}</Pill>;
 }
+
+/* ── ChannelPreview ── shows how the post looks per platform ── */
+export function ChannelPreview({ text, channels }) {
+  const previews = channels.filter(c => c.id && ["telegram","twitter","discord","instagram"].includes(c.id));
+  const [active, setActive] = useState(previews[0]?.id || "telegram");
+
+  if (!text?.trim() || previews.length === 0) return null;
+
+  const channel = previews.find(c => c.id === active) || previews[0];
+
+  const configs = {
+    telegram: {
+      bg: "#17212b", border: "#2b5278", bubble: "#2b5278",
+      header: { icon: "✈", name: "SupraPost", color: "#34b7eb" },
+      render: (t) => (
+        <div style={{ background: "#17212b", borderRadius: 12, padding: 14, border: "1px solid #2b527844" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#34b7eb22", border: "1px solid #34b7eb44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>✈</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "0.84rem", color: "#34b7eb" }}>SupraPost</div>
+              <div style={{ fontSize: "0.68rem", color: "#708499" }}>Bot</div>
+            </div>
+          </div>
+          <div style={{ background: "#2b5278", borderRadius: "4px 12px 12px 12px", padding: "10px 13px" }}>
+            <div style={{ fontSize: "0.86rem", lineHeight: 1.6, whiteSpace: "pre-wrap", color: "#e4ecf4" }}>{t}</div>
+            <div style={{ fontSize: "0.64rem", color: "#708499", marginTop: 6, textAlign: "right" }}>just now ✓✓</div>
+          </div>
+        </div>
+      ),
+    },
+    twitter: {
+      render: (t) => (
+        <div style={{ background: "#000", borderRadius: 12, padding: 16, border: "1px solid #2f3336" }}>
+          <div style={{ display: "flex", gap: 11, marginBottom: 10 }}>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "0.9rem", color: "#fff", flexShrink: 0 }}>S</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "#e7e9ea" }}>SupraPost</div>
+              <div style={{ fontSize: "0.74rem", color: "#71767b" }}>@suprapost_bot</div>
+            </div>
+          </div>
+          <div style={{ fontSize: "0.9rem", lineHeight: 1.65, whiteSpace: "pre-wrap", color: "#e7e9ea", marginBottom: 12 }}>
+            {t.length > 280 ? t.slice(0, 277) + "..." : t}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", color: "#71767b", fontSize: "0.78rem" }}>
+            <span>💬 0</span><span>🔁 0</span><span>❤️ 0</span><span>📊</span>
+          </div>
+          {t.length > 280 && (
+            <div style={{ fontSize: "0.68rem", color: "#1d9bf0", marginTop: 6 }}>Text truncated to 280 chars for Twitter</div>
+          )}
+        </div>
+      ),
+    },
+    discord: {
+      render: (t) => (
+        <div style={{ background: "#313338", borderRadius: 12, padding: 14, border: "1px solid #1e1f2244" }}>
+          <div style={{ display: "flex", gap: 11 }}>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#5865F222", border: "1px solid #5865F244", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", flexShrink: 0 }}>🎮</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "#5865F2" }}>SupraPost</span>
+                <span style={{ fontSize: "0.64rem", color: "#5c5e66", background: "#5865F222", padding: "1px 5px", borderRadius: 4 }}>BOT</span>
+                <span style={{ fontSize: "0.68rem", color: "#5c5e66" }}>Today at {new Date().getHours()}:{String(new Date().getMinutes()).padStart(2,"0")}</span>
+              </div>
+              <div style={{ fontSize: "0.88rem", lineHeight: 1.6, whiteSpace: "pre-wrap", color: "#dbdee1" }}>{t}</div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    instagram: {
+      render: (t) => (
+        <div style={{ background: "#000", borderRadius: 12, border: "1px solid #262626", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 14px", borderBottom: "1px solid #262626" }}>
+            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem" }}>📷</div>
+            <span style={{ fontWeight: 700, fontSize: "0.84rem", color: "#fff" }}>suprapost_bot</span>
+          </div>
+          <div style={{ background: "#111", aspectRatio: "1", display: "flex", alignItems: "center", justifyContent: "center", color: "#333", fontSize: "2rem" }}>🖼</div>
+          <div style={{ padding: "10px 14px" }}>
+            <div style={{ fontSize: "0.82rem", lineHeight: 1.55, color: "#e0e0e0" }}>
+              <span style={{ fontWeight: 700, color: "#fff" }}>suprapost_bot </span>
+              {t.length > 150 ? t.slice(0, 147) + "... more" : t}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+  };
+
+  return (
+    <div>
+      {/* Channel tabs */}
+      {previews.length > 1 && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+          {previews.map(c => (
+            <button key={c.id} onClick={() => setActive(c.id)} style={{
+              all: "unset", cursor: "pointer",
+              padding: "5px 12px", borderRadius: 8,
+              fontSize: "0.76rem", fontWeight: 600,
+              background: active === c.id ? `${c.color}18` : "transparent",
+              border: `1px solid ${active === c.id ? c.color + "55" : "transparent"}`,
+              color: active === c.id ? c.color : C.muted,
+              transition: "all 0.15s",
+            }}>
+              {c.icon} {c.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {/* Preview */}
+      <div className="fade-up" key={active}>
+        {configs[active]?.render(text) || (
+          <div style={{ fontSize: "0.8rem", color: C.muted, padding: "20px 0", textAlign: "center" }}>
+            Preview not available for this channel
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { C, fmt } from "../theme";
 import {
   Btn, Card, Field, Input, Log, ScoreBar, Select,
-  TextArea, TweetPreview, ChannelResultsRow, ImagePanel, Switch, Pill,
+  TextArea, TweetPreview, ChannelPreview, ChannelResultsRow, ImagePanel, Switch, Pill,
 } from "../components/ui";
 
 /* ============================================================
@@ -328,16 +328,15 @@ export function ComposePage({
             </div>
           )}
 
-          {/* Text preview */}
-          {(mode === "text" || mode === "both") && hasText && (
-            <TweetPreview
-              text={text}
-              via={
-                (targetIds === null ? configuredChannels : configuredChannels.filter((c) => targetIds.includes(c.id)))
-                  .map((c) => c.name).join(" + ") || "SupraPost"
-              }
-            />
-          )}
+          {/* Channel preview — tabs per platform */}
+          {(mode === "text" || mode === "both") && hasText && (() => {
+            const targeted = targetIds === null
+              ? configuredChannels
+              : configuredChannels.filter(c => targetIds.includes(c.id));
+            return targeted.length > 0
+              ? <ChannelPreview text={text} channels={targeted} />
+              : <TweetPreview text={text} via="SupraPost" />;
+          })()}
 
           {/* Empty state */}
           {!readyToPost && (
