@@ -12,7 +12,7 @@ export function AutomationPage({
       {!isMobile && (
         <div>
           <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Automation</div>
-          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>Posts automatically to all enabled channels on your schedule.</div>
+          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>Publica automaticamente em todos os canais activos, no horário que definires.</div>
         </div>
       )}
 
@@ -22,12 +22,12 @@ export function AutomationPage({
           running={automation.running}
           size={isMobile ? 150 : 188}
           label={automation.running ? (countdown || "—") : "Stopped"}
-          sublabel={automation.running ? "next post in" : "automation inactive"}
+          sublabel={automation.running ? "próximo post em" : "automação inativa"}
         />
         <div style={{ marginTop: 22 }}>
           {!automation.running
-            ? <Btn variant="primary" size="lg" onClick={startAuto} disabled={active.length === 0}>▶ Start Automation</Btn>
-            : <Btn variant="danger" size="lg" onClick={stopAuto}>■ Stop Automation</Btn>}
+            ? <Btn variant="primary" size="lg" onClick={active.length === 0 ? () => {} : startAuto} disabled={active.length === 0}>▶ Iniciar Automação</Btn>
+            : <Btn variant="danger" size="lg" onClick={stopAuto}>■ Parar</Btn>}
         </div>
         <div style={{ marginTop: 16, display: "flex", justifyContent: "center", gap: 7, flexWrap: "wrap" }}>
           {active.length === 0 ? (
@@ -39,25 +39,25 @@ export function AutomationPage({
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 13 }}>
-        <StatTile label="Auto Posts" value={posts.filter((p) => p.auto).length} color={C.supra} />
-        <StatTile label="SUPRA / Cycle" value={fmt(wallet.costPerPost)} color={C.accent} />
-        <StatTile label="Total Spent" value={fmt(stats.supraEarned)} color={C.warn} />
-        <StatTile label="Generated" value={stats.totalGenerations} color={C.accent2} />
+        <StatTile label="Posts Auto" value={posts.filter((p) => p.auto).length} color={C.supra} />
+        <StatTile label="SUPRA / Post" value={fmt(wallet.costPerPost)} color={C.accent} />
+        <StatTile label="Total Gasto" value={fmt(stats.supraEarned)} color={C.warn} />
+        <StatTile label="Gerados" value={stats.totalGenerations} color={C.accent2} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
-        <Card eyebrow="Schedule" title="Cycle Settings">
+        <Card eyebrow="Agendamento" title="Frequência de publicação">
           <Select
             value={automation.cycleSeconds}
             onChange={(e) => saveAutomationSettings({ cycleSeconds: Number(e.target.value) })}
             disabled={automation.running}
             style={{ marginBottom: 13 }}
           >
-            <option value={3600}>1 hour</option>
-            <option value={10800}>3 hours</option>
-            <option value={21600}>6 hours</option>
-            <option value={43200}>12 hours</option>
-            <option value={86400}>24 hours</option>
+            <option value={3600}>A cada 1 hora</option>
+            <option value={10800}>A cada 3 horas</option>
+            <option value={21600}>A cada 6 horas</option>
+            <option value={43200}>A cada 12 horas</option>
+            <option value={86400}>1 vez por dia</option>
           </Select>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 15px" }}>
             <div>

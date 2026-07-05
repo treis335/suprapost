@@ -6,10 +6,10 @@ import { depositSupra } from "./payment";
 
 const TABS = [
   { id: "setup",      icon: "⚙",  label: "Setup" },
-  { id: "channels",   icon: "📡", label: "Channels" },
+  { id: "channels",   icon: "📡", label: "Canais" },
   { id: "compose",    icon: "✦",  label: "Compose" },
-  { id: "automation", icon: "⚡", label: "Automation" },
-  { id: "history",    icon: "📋", label: "History" },
+  { id: "automation", icon: "⚡", label: "Automação" },
+  { id: "history",    icon: "📋", label: "Histórico" },
 ];
 
 const fmt = (n) => Number(n ?? 0).toFixed(2);
@@ -330,7 +330,7 @@ function OnboardingChecklist({ settings, channels, wallet, onNavigate }) {
   const steps = [
     { done: hasProfile, label: "Fill in your content profile", action: null },
     { done: hasChannel, label: "Connect a channel", action: () => onNavigate("channels") },
-    { done: hasBalance, label: "Deposit SUPRA", action: () => onNavigate("setup") },
+    { done: hasBalance, label: "Depositar SUPRA", action: () => onNavigate("setup") },
   ];
 
   return (
@@ -563,7 +563,7 @@ function TopUpFlow({ walletAddress, onCredited }) {
         <Input type="number" min="1" value={amount}
           onChange={(e) => setAmount(e.target.value)} style={{ flex: 1 }} disabled={!!status} />
         <Btn variant="supra" onClick={handleDeposit} disabled={!!status}>
-          {status ? "…" : "Deposit SUPRA"}
+          {status ? "…" : "Depositar SUPRA"}
         </Btn>
       </div>
       {status && (
@@ -735,11 +735,11 @@ export default function App() {
               {shortAddress(session?.address)}
             </div>
           </div>
-          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
+          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sair</Btn>
         </div>
       </Card>
 
-      <Card id="deposit-section" eyebrow="Payments" title="SUPRA Balance" accentTop={C.supra}>
+      <Card id="deposit-section" eyebrow="Payments" title="Saldo SUPRA" accentTop={C.supra}>
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontFamily: C.mono, fontSize: "1.7rem", color: C.supra, fontWeight: 600 }}>
             {fmt(wallet.balance)} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span>
@@ -1097,7 +1097,7 @@ export default function App() {
           <Pill color={C.supra}>⬡ {fmt(wallet.balance)} SUPRA</Pill>
           <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Automation active" : "Idle"}</Pill>
           <Pill color={C.accent2} title={session?.address}>{shortAddress(session?.address)}</Pill>
-          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
+          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sair</Btn>
         </div>
       </div>
 
