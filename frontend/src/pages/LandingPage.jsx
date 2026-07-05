@@ -151,19 +151,45 @@ function useDemo() {
   return { niche, setNiche, phase, typed, score, run };
 }
 
-function AIImageThumb({ colors, seed = 0 }) {
-  const id = `g${seed}`;
+function AIImageThumb({ variant = "chart", colors, seed = 0 }) {
+  const [c1, c2] = colors;
+  if (variant === "chart") {
+    const bars = [38, 52, 44, 66, 58, 74, 68, 86];
+    return (
+      <svg width="100%" height="140" viewBox="0 0 300 140" style={{ display: "block", borderRadius: 10, background: "#0d1119" }}>
+        <line x1="0" y1="110" x2="300" y2="110" stroke={C.border} strokeWidth="1" />
+        {bars.map((h, i) => (
+          <rect key={i} x={10 + i * 36} y={110 - h} width="20" height={h} rx="3"
+            fill={i % 2 === 0 ? c1 : c2} opacity={0.55 + i * 0.05} />
+        ))}
+        <path d={`M10,${108 - bars[0]} ${bars.map((h, i) => `L${20 + i * 36},${108 - h}`).join(" ")}`}
+          stroke={c2} strokeWidth="2" fill="none" opacity="0.9" />
+      </svg>
+    );
+  }
+  if (variant === "network") {
+    const pts = [[40, 40], [140, 25], [250, 55], [70, 100], [190, 105], [260, 30]];
+    return (
+      <svg width="100%" height="140" viewBox="0 0 300 140" style={{ display: "block", borderRadius: 10, background: "#0d1119" }}>
+        {pts.map((p, i) => pts.slice(i + 1).map((q, j) => (
+          <line key={`${i}-${j}`} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} stroke={c1} strokeWidth="1" opacity="0.25" />
+        )))}
+        {pts.map((p, i) => (
+          <circle key={i} cx={p[0]} cy={p[1]} r={i % 2 === 0 ? 7 : 5} fill={i % 2 === 0 ? c1 : c2} opacity="0.9" />
+        ))}
+      </svg>
+    );
+  }
+  // skyline / growth
+  const towers = [30, 55, 40, 80, 60, 95, 70];
   return (
-    <svg width="100%" height="130" viewBox="0 0 300 130" style={{ display: "block", borderRadius: 10 }}>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={colors[0]} />
-          <stop offset="100%" stopColor={colors[1]} />
-        </linearGradient>
-      </defs>
-      <rect width="300" height="130" fill={`url(#${id})`} opacity="0.85" />
-      <circle cx={70 + seed * 30} cy="40" r="55" fill={colors[1]} opacity="0.25" />
-      <circle cx={220 - seed * 20} cy="90" r="70" fill={colors[0]} opacity="0.2" />
+    <svg width="100%" height="140" viewBox="0 0 300 140" style={{ display: "block", borderRadius: 10, background: "#0d1119" }}>
+      <line x1="0" y1="118" x2="300" y2="118" stroke={C.border} strokeWidth="1" />
+      {towers.map((h, i) => (
+        <rect key={i} x={12 + i * 40} y={118 - h} width="26" height={h} rx="2" fill={i % 2 === 0 ? c1 : c2} opacity={0.5 + i * 0.06} />
+      ))}
+      <path d="M12,90 L60,60 L110,75 L160,40 L210,50 L250,20" stroke={c2} strokeWidth="2.5" fill="none" opacity="0.9" />
+      <circle cx="250" cy="20" r="4" fill={c2} />
     </svg>
   );
 }
@@ -245,12 +271,13 @@ function LiveDemo() {
 const EXAMPLE_POSTS = [
   { platform: "telegram", tag: "Telegram", handle: "Supra Alpha", time: "2m", color: "#34b7eb", initial: "S",
     text: "Stop trading noise. Start building signal. Supra fundamentals have never been stronger — on-chain data doesn't lie. 📈",
-    image: [C.accent, C.accent2] },
+    image: [C.accent, C.accent2], variant: "chart" },
   { platform: "twitter", tag: "X", handle: "@supraalpha", time: "5m", color: "#e7e9ea", initial: "S",
-    text: "GM builders ☀️ Shipping is the only alpha. What are you building on Supra this week?", image: null },
+    text: "GM builders ☀️ Shipping is the only alpha. What are you building on Supra this week?",
+    image: [C.accent2, C.supra], variant: "network" },
   { platform: "discord", tag: "Discord", handle: "supra-updates", time: "12m", color: "#5865F2", initial: "S",
     text: "New week, new milestones. The roadmap update is live in #announcements — feedback welcome!",
-    image: [C.supra, C.accent2] },
+    image: [C.supra, C.accent], variant: "skyline" },
 ];
 
 export function LandingPage({ onEnter }) {
@@ -448,7 +475,7 @@ export function LandingPage({ onEnter }) {
                   <div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.58, marginBottom: p.image ? 12 : 14 }}>{p.text}</div>
                   {p.image && (
                     <div style={{ marginBottom: 14 }}>
-                      <AIImageThumb colors={p.image} seed={idx} />
+                      <AIImageThumb variant={p.variant} colors={p.image} seed={idx} />
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 18, fontSize: "0.76rem", color: C.muted, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
