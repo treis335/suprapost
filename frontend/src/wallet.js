@@ -1,9 +1,5 @@
 /**
  * StarKey / Supra wallet connection + sign-in flow.
- *
- * StarKey injects window.starkey.supra into the page.
- * signMessage() in StarKey expects a Uint8Array and returns
- * { signature: Uint8Array, publicKey: Uint8Array }.
  */
 
 const SESSION_KEY = "suprapost_session";
@@ -12,9 +8,7 @@ function getProvider() {
   return typeof window !== "undefined" ? window?.starkey?.supra : undefined;
 }
 
-export function isStarKeyInstalled() {
-  return !!getProvider();
-}
+export function isStarKeyInstalled() { return !!getProvider(); }
 
 export function waitForStarKey(timeoutMs = 4000) {
   return new Promise((resolve) => {
@@ -27,66 +21,91 @@ export function waitForStarKey(timeoutMs = 4000) {
   });
 }
 
-async function connectWallet() {
-  const p = getProvider();
-  if (!p) throw new Error("StarKey not detected — install it from starkey.app");
-  const accounts = await p.connect();
-  const address = Array.isArray(accounts) ? accounts[0]
-    : accounts?.address ?? accounts;
-  if (!address) throw new Error("No account returned from wallet");
-  return typeof address === "string" ? address : String(address);
+/** Normalise any address format — consistent with backend's normaliseAddress() */
+function normaliseAddress(address) {
+  if (!address) return "";
+  const s = String(address).trim();
+  // Keep 0x prefix for display but normalise internally
+  return s.startsWith("0x") ? s : "0x" + s;
 }
 
-/* ── helpers ─────────────────────────────────────────────── */
+function extractAddress(accounts) {
+  const raw = Array.isArray(accounts) ? accounts[0] : (accounts?.address ?? accounts);
+  if (!raw) throw new Error("No account returned from wallet");
+  return normaliseAddress(typeof raw === "string" ? raw : String(raw));
+}
 
 /** Any value → lowercase hex string without 0x prefix */
 function toHex(val) {
   if (!val) return "";
-  if (typeof val === "string") return val.startsWith("0x") ? val.slice(2) : val;
+  if (typeof val === "string") return val.startsWith("0x") ? val.slice(2).toLowerCase() : val.toLowerCase();
   if (val instanceof Uint8Array) return Array.from(val).map(b => b.toString(16).padStart(2, "0")).join("");
-  if (Array.isArray(val)) return val.map(b => Number(b).toString(16).padStart(2, "0")).join("");
+  if (Array.isArray(val))        return val.map(b => Number(b).toString(16).padStart(2, "0")).join("");
   return String(val);
 }
 
-/** String → Uint8Array (UTF-8) */
-function strToBytes(s) {
-  return new TextEncoder().encode(s);
-}
-
-/* ── sign-in flow ─────────────────────────────────────────── */
+function strToBytes(s) { return new TextEncoder().encode(s); }
 
 export async function signInWithWallet() {
-  const address = await connectWallet();
-
-  // 1. Get a one-time challenge message from our backend
-  const nonceRes = await fetch("/api/auth/nonce", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address }),
-  });
-  if (!nonceRes.ok) throw new Error("Failed to get sign-in challenge from server");
-  const { message } = await nonceRes.json();
-  if (!message) throw new Error("Server returned empty challenge message");
-
-  // 2. Ask the wallet to sign it.
-  //    StarKey expects Uint8Array — pass bytes, not a plain string.
   const p = getProvider();
-  const msgBytes = strToBytes(message);
-  const raw = await p.signMessage(msgBytes);
+  if (!p) throw new Error("StarKey not detected — install it from starkey.app");
 
-  // 3. Normalise the response — StarKey may return Uint8Array values
+  // Step 1: connect and get the address
+  let accounts;
+  try {
+    accounts = await p.connect();
+  } catch (e) {
+    throw new Error("Wallet connection rejected");
+  }
+  const address = extractAddress(accounts);
+
+  console.log("[wallet] Connected address:", address);
+
+  // Step 2: get challenge from backend — use the SAME address we just got
+  let message;
+  try {
+    const nonceRes = await fetch("/api/auth/nonce", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address }),
+    });
+    if (!nonceRes.ok) throw new Error(`Server error ${nonceRes.status}`);
+    const data = await nonceRes.json();
+    message = data.message;
+    if (!message) throw new Error("Server returned empty challenge");
+  } catch (e) {
+    throw new Error("Failed to get sign-in challenge: " + e.message);
+  }
+
+  // Step 3: sign the challenge
+  let raw;
+  try {
+    raw = await p.signMessage(strToBytes(message));
+  } catch (e) {
+    const rejected = e.message?.toLowerCase().includes("reject") ||
+      e.message?.toLowerCase().includes("cancel") || e.code === 4001;
+    throw new Error(rejected ? "Signing cancelled" : "Wallet signing failed: " + e.message);
+  }
+
   const signature = toHex(raw?.signature ?? raw?.sig ?? raw);
   const publicKey = toHex(raw?.publicKey ?? raw?.public_key ?? raw?.pubKey ?? "");
-
   if (!signature) throw new Error("Wallet returned empty signature");
 
-  // 4. Send to backend for verification
-  const verifyRes = await fetch("/api/auth/verify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address, signature, publicKey }),
-  });
-  const result = await verifyRes.json();
+  console.log("[wallet] Signature obtained, verifying with backend...");
+
+  // Step 4: verify — use SAME address from step 1
+  let result;
+  try {
+    const verifyRes = await fetch("/api/auth/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address, signature, publicKey }),
+    });
+    result = await verifyRes.json();
+  } catch (e) {
+    throw new Error("Network error during verification: " + e.message);
+  }
+
   if (!result.ok) throw new Error(result.error || "Sign-in verification failed");
 
   const session = { address: result.address, token: result.token };
@@ -101,11 +120,10 @@ export function getSession() {
   } catch { return null; }
 }
 
-export function clearSession() {
-  sessionStorage.removeItem(SESSION_KEY);
-}
+export function clearSession() { sessionStorage.removeItem(SESSION_KEY); }
 
 export function shortAddress(address) {
   if (!address) return "";
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+  const s = address.startsWith("0x") ? address : "0x" + address;
+  return `${s.slice(0, 6)}…${s.slice(-4)}`;
 }
