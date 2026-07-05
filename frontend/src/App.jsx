@@ -417,6 +417,105 @@ function DepositHistory() {
   );
 }
 
+
+/* ── DepositHistoryFull — for History tab ────────────────────────────────── */
+function DepositHistoryFull() {
+  const [deposits, setDeposits] = useState(null);
+
+  useEffect(() => {
+    const session = getSession();
+    fetch("/api/wallet/deposits", { headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {} })
+      .then(r => r.json())
+      .then(d => setDeposits(d.ok ? d.deposits : []))
+      .catch(() => setDeposits([]));
+  }, []);
+
+  if (deposits === null) return <div style={{ fontSize: "0.8rem", color: C.muted, padding: 20 }}>Loading…</div>;
+  if (deposits.length === 0) return (
+    <Card style={{ textAlign: "center", padding: 48, border: `1.5px dashed ${C.border}`, background: "transparent" }}>
+      <div style={{ color: C.muted, fontSize: "0.86rem" }}>No deposits yet</div>
+    </Card>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {deposits.map(d => (
+        <Card key={d.id} style={{ padding: "12px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <span style={{ color: C.supra, fontWeight: 700, fontSize: "1rem", fontFamily: C.mono }}>+{d.amount} SUPRA</span>
+              <span style={{ color: C.muted, fontSize: "0.72rem", marginLeft: 12 }}>
+                {new Date(d.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+            {d.txHash ? (
+              <a href={`https://suprascan.io/tx/${d.txHash.replace("0x","")}`} target="_blank" rel="noreferrer"
+                style={{ color: C.accent2, textDecoration: "none", fontFamily: C.mono, fontSize: "0.72rem" }}>
+                {d.txHash.slice(0,10)}…{d.txHash.slice(-6)} ↗
+              </a>
+            ) : <span style={{ color: C.muted, fontSize: "0.72rem" }}>—</span>}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/* ── Login Screen ────────────────────────────────────────────────────────── */
+function LoginScreen({ onSignedIn, isMobile }) {
+  const [installed, setInstalled] = useState(null);
+  const [signing, setSigning] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    waitForStarKey(3000).then(ok => setInstalled(ok)).catch(() => setInstalled(false));
+  }, []);
+
+  async function handleSignIn() {
+    setSigning(true); setError("");
+    try {
+      const session = await signInWithWallet();
+      onSignedIn(session);
+    } catch (e) {
+      setError(e.message || "Sign-in failed — try again");
+    }
+    setSigning(false);
+  }
+
+  return (
+    <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <GlobalStyle />
+      <div style={{ width: "100%", maxWidth: 420, textAlign: "center" }} className="fade-up">
+        <div style={{ width: 64, height: 64, borderRadius: 18, background: `linear-gradient(135deg, ${C.accent}22, ${C.accentDeep}22)`, border: `1.5px solid ${C.accent}44`, margin: "0 auto 24px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", boxShadow: `0 8px 24px -8px ${C.accent}88` }}>⬡</div>
+        <div style={{ fontSize: "2rem", fontWeight: 700, fontFamily: C.display, letterSpacing: "-0.02em", marginBottom: 8 }}>
+          Supra<span style={{ color: C.accent }}>Post</span>
+        </div>
+        <div style={{ fontSize: "0.85rem", color: C.muted, marginBottom: 32 }}>AI Social Automation</div>
+
+        <Card>
+          <div style={{ fontSize: "1.05rem", fontWeight: 600, fontFamily: C.display, marginBottom: 8 }}>Sign in with your Supra wallet</div>
+          <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6, marginBottom: 26 }}>
+            No password, no email. Connect your StarKey wallet and start automating your posts in seconds.
+          </div>
+          {installed === false && (
+            <div style={{ fontSize: "0.78rem", color: C.warn, background: `${C.warn}14`, border: `1px solid ${C.warn}33`, borderRadius: 10, padding: 12, marginBottom: 16, lineHeight: 1.6 }}>
+              StarKey wallet not detected. Install the extension from{" "}
+              <a href="https://starkey.app" target="_blank" rel="noreferrer" style={{ color: C.warn }}>starkey.app</a> and reload.
+            </div>
+          )}
+          {error && (
+            <div style={{ fontSize: "0.78rem", color: C.danger, background: `${C.danger}14`, border: `1px solid ${C.danger}33`, borderRadius: 10, padding: 12, marginBottom: 16 }}>{error}</div>
+          )}
+          <Btn variant="primary" full size="lg" onClick={handleSignIn} disabled={signing || installed === false}>
+            {signing ? "Signing in…" : "Connect wallet"}
+          </Btn>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+
 /* ── TopUpFlow ───────────────────────────────────────────────────────────── */
 function TopUpFlow({ walletAddress, onCredited }) {
   const [amount, setAmount] = useState(10);
@@ -1064,103 +1163,6 @@ export default function App() {
             </>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── DepositHistoryFull — for History tab ────────────────────────────────── */
-function DepositHistoryFull() {
-  const [deposits, setDeposits] = useState(null);
-
-  useEffect(() => {
-    const session = getSession();
-    fetch("/api/wallet/deposits", { headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {} })
-      .then(r => r.json())
-      .then(d => setDeposits(d.ok ? d.deposits : []))
-      .catch(() => setDeposits([]));
-  }, []);
-
-  if (deposits === null) return <div style={{ fontSize: "0.8rem", color: C.muted, padding: 20 }}>Loading…</div>;
-  if (deposits.length === 0) return (
-    <Card style={{ textAlign: "center", padding: 48, border: `1.5px dashed ${C.border}`, background: "transparent" }}>
-      <div style={{ color: C.muted, fontSize: "0.86rem" }}>No deposits yet</div>
-    </Card>
-  );
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {deposits.map(d => (
-        <Card key={d.id} style={{ padding: "12px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <span style={{ color: C.supra, fontWeight: 700, fontSize: "1rem", fontFamily: C.mono }}>+{d.amount} SUPRA</span>
-              <span style={{ color: C.muted, fontSize: "0.72rem", marginLeft: 12 }}>
-                {new Date(d.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
-              </span>
-            </div>
-            {d.txHash ? (
-              <a href={`https://suprascan.io/tx/${d.txHash.replace("0x","")}`} target="_blank" rel="noreferrer"
-                style={{ color: C.accent2, textDecoration: "none", fontFamily: C.mono, fontSize: "0.72rem" }}>
-                {d.txHash.slice(0,10)}…{d.txHash.slice(-6)} ↗
-              </a>
-            ) : <span style={{ color: C.muted, fontSize: "0.72rem" }}>—</span>}
-          </div>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-/* ── Login Screen ────────────────────────────────────────────────────────── */
-function LoginScreen({ onSignedIn, isMobile }) {
-  const [installed, setInstalled] = useState(null);
-  const [signing, setSigning] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    waitForStarKey(3000).then(ok => setInstalled(ok)).catch(() => setInstalled(false));
-  }, []);
-
-  async function handleSignIn() {
-    setSigning(true); setError("");
-    try {
-      const session = await signInWithWallet();
-      onSignedIn(session);
-    } catch (e) {
-      setError(e.message || "Sign-in failed — try again");
-    }
-    setSigning(false);
-  }
-
-  return (
-    <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <GlobalStyle />
-      <div style={{ width: "100%", maxWidth: 420, textAlign: "center" }} className="fade-up">
-        <div style={{ width: 64, height: 64, borderRadius: 18, background: `linear-gradient(135deg, ${C.accent}22, ${C.accentDeep}22)`, border: `1.5px solid ${C.accent}44`, margin: "0 auto 24px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", boxShadow: `0 8px 24px -8px ${C.accent}88` }}>⬡</div>
-        <div style={{ fontSize: "2rem", fontWeight: 700, fontFamily: C.display, letterSpacing: "-0.02em", marginBottom: 8 }}>
-          Supra<span style={{ color: C.accent }}>Post</span>
-        </div>
-        <div style={{ fontSize: "0.85rem", color: C.muted, marginBottom: 32 }}>AI Social Automation</div>
-
-        <Card>
-          <div style={{ fontSize: "1.05rem", fontWeight: 600, fontFamily: C.display, marginBottom: 8 }}>Sign in with your Supra wallet</div>
-          <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6, marginBottom: 26 }}>
-            No password, no email. Connect your StarKey wallet and start automating your posts in seconds.
-          </div>
-          {installed === false && (
-            <div style={{ fontSize: "0.78rem", color: C.warn, background: `${C.warn}14`, border: `1px solid ${C.warn}33`, borderRadius: 10, padding: 12, marginBottom: 16, lineHeight: 1.6 }}>
-              StarKey wallet not detected. Install the extension from{" "}
-              <a href="https://starkey.app" target="_blank" rel="noreferrer" style={{ color: C.warn }}>starkey.app</a> and reload.
-            </div>
-          )}
-          {error && (
-            <div style={{ fontSize: "0.78rem", color: C.danger, background: `${C.danger}14`, border: `1px solid ${C.danger}33`, borderRadius: 10, padding: 12, marginBottom: 16 }}>{error}</div>
-          )}
-          <Btn variant="primary" full size="lg" onClick={handleSignIn} disabled={signing || installed === false}>
-            {signing ? "Signing in…" : "Connect wallet"}
-          </Btn>
-        </Card>
       </div>
     </div>
   );
