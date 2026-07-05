@@ -343,37 +343,133 @@ function OnboardingChecklist({ settings, channels, wallet, onNavigate }) {
   const hasProfile = !!(settings.niche && settings.tone);
   const hasChannel = channels.some(c => c.configured && c.enabled);
   const hasBalance = wallet.balance >= wallet.costPerPost;
+  const allDone = hasProfile && hasChannel && hasBalance;
 
-  if (hasProfile && hasChannel && hasBalance) return null;
+  // Dismiss permanently once all steps are done
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem("suprapost_onboarding_done") === "1"; } catch { return false; }
+  });
+
+  if (allDone && !dismissed) {
+    localStorage.setItem("suprapost_onboarding_done", "1");
+  }
+  if (dismissed || allDone) return null;
 
   const steps = [
-    { done: hasProfile, label: "Fill in your content profile", action: null },
-    { done: hasChannel, label: "Connect a channel", action: () => onNavigate("channels") },
-    { done: hasBalance, label: "Deposit SUPRA", action: () => onNavigate("setup") },
+    {
+      done: hasProfile,
+      icon: "✦",
+      label: "Set up your content profile",
+      sub: "Define your niche, tone, and audience",
+      action: null,
+    },
+    {
+      done: hasChannel,
+      icon: "📡",
+      label: "Connect a channel",
+      sub: "Telegram, Discord, Twitter or Instagram",
+      action: () => onNavigate("channels"),
+    },
+    {
+      done: hasBalance,
+      icon: "⬡",
+      label: "Deposit SUPRA",
+      sub: "1 SUPRA per post — top up anytime",
+      action: () => onNavigate("setup"),
+    },
   ];
 
+  const doneCount = steps.filter(s => s.done).length;
+  const pct = Math.round((doneCount / steps.length) * 100);
+
   return (
-    <Card accentTop={C.accent} style={{ marginBottom: 0 }}>
-      <div style={{ fontSize: "0.7rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 12, fontFamily: C.mono }}>Get started</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="fade-up" style={{
+      background: `linear-gradient(135deg, ${C.accent}0a, ${C.supra}08)`,
+      border: `1px solid ${C.accent}33`,
+      borderRadius: 14, padding: "16px 18px", marginBottom: 0,
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: "0.88rem", fontWeight: 700, fontFamily: C.display, color: C.text }}>
+            Get started — {doneCount} of {steps.length} done
+          </div>
+          <div style={{ fontSize: "0.72rem", color: C.muted, marginTop: 2 }}>
+            Complete these steps to start publishing automatically
+          </div>
+        </div>
+        <span style={{ fontSize: "0.76rem", fontWeight: 700, color: C.accent, fontFamily: C.mono }}>{pct}%</span>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ height: 3, background: C.border, borderRadius: 2, marginBottom: 14, overflow: "hidden" }}>
+        <div style={{
+          height: "100%", borderRadius: 2,
+          width: `${pct}%`,
+          background: `linear-gradient(90deg, ${C.accent}, ${C.supra})`,
+          transition: "width 0.5s ease",
+        }} />
+      </div>
+
+      {/* Steps */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {steps.map((s, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div key={i} style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "10px 12px", borderRadius: 9,
+            background: s.done ? `${C.supra}0a` : C.raised,
+            border: `1px solid ${s.done ? C.supra + "33" : C.border}`,
+            opacity: s.done ? 0.65 : 1,
+            transition: "all 0.3s",
+          }}>
+            {/* Circle */}
             <div style={{
-              width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
-              background: s.done ? `${C.supra}20` : C.raised,
+              width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+              background: s.done ? `${C.supra}22` : C.surface,
               border: `1.5px solid ${s.done ? C.supra : C.border}`,
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "0.7rem", color: s.done ? C.supra : C.muted,
+              fontSize: s.done ? "0.72rem" : "0.85rem",
+              color: s.done ? C.supra : C.text2,
               transition: "all 0.3s",
-            }}>{s.done ? "✓" : i + 1}</div>
-            <span style={{ fontSize: "0.82rem", color: s.done ? C.muted : C.text, textDecoration: s.done ? "line-through" : "none", flex: 1 }}>{s.label}</span>
+            }}>
+              {s.done ? "✓" : s.icon}
+            </div>
+
+            {/* Text */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: "0.82rem", fontWeight: 600,
+                color: s.done ? C.muted : C.text,
+                textDecoration: s.done ? "line-through" : "none",
+              }}>{s.label}</div>
+              {!s.done && (
+                <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 1 }}>{s.sub}</div>
+              )}
+            </div>
+
+            {/* CTA */}
             {!s.done && s.action && (
-              <button onClick={s.action} style={{ all: "unset", cursor: "pointer", fontSize: "0.74rem", color: C.accent, fontWeight: 600 }}>Go →</button>
+              <button onClick={s.action} style={{
+                all: "unset", cursor: "pointer",
+                padding: "5px 12px", borderRadius: 7,
+                fontSize: "0.74rem", fontWeight: 700,
+                background: `${C.accent}18`,
+                color: C.accent,
+                border: `1px solid ${C.accent}44`,
+                whiteSpace: "nowrap", flexShrink: 0,
+                transition: "background 0.15s",
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = `${C.accent}28`}
+                onMouseLeave={e => e.currentTarget.style.background = `${C.accent}18`}
+              >Set up →</button>
+            )}
+            {!s.done && !s.action && (
+              <span style={{ fontSize: "0.7rem", color: C.muted, fontStyle: "italic", flexShrink: 0 }}>this tab</span>
             )}
           </div>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }
 
