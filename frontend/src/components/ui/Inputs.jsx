@@ -11,8 +11,8 @@ export function Field({ label, hint, children }) {
 }
 
 const inputStyle = {
-  width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10,
-  color: C.text, fontFamily: C.sans, fontSize: "0.86rem", padding: "11px 14px",
+  width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 11,
+  color: C.text, fontFamily: C.sans, fontSize: "0.86rem", padding: "12px 14px",
   outline: "none", boxSizing: "border-box", transition: "border-color 0.15s, box-shadow 0.15s",
 };
 

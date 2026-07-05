@@ -4,27 +4,28 @@
    is the orbit ring: a circular progress indicator that visualises
    the automation cycle as something alive, not just a countdown.
 
-   Palette: near-black with violet undertone (not neutral gray),
-   a warm signal-green for SUPRA/success, electric cyan for data/
-   links, and a soft coral for danger — kept rare.
+   Palette: deep indigo-charcoal base (comfortable, premium fintech
+   feel rather than "neon crypto"), one confident violet-blue accent
+   for actions, a warm emerald reserved for money/success, soft teal
+   for data, and a gentle coral for danger — kept rare.
 ============================================================ */
 export const C = {
-  bg: "#08070d",
-  bgGrad: "radial-gradient(ellipse 120% 80% at 50% -10%, #14101f 0%, #08070d 55%)",
-  surface: "#100e1a",
-  surface2: "#171328",
-  raised: "#1c1830",
-  border: "#231f38",
-  borderLight: "#332c52",
-  accent: "#9b6bff",
-  accentDeep: "#7c4cf0",
-  accent2: "#3ed9d0",
-  supra: "#3ddc91",
-  warn: "#f5b942",
-  danger: "#ff6b81",
-  text: "#f1eefc",
-  text2: "#a59cc7",
-  muted: "#5f5783",
+  bg: "#0a0d14",
+  bgGrad: "radial-gradient(ellipse 120% 80% at 50% -10%, #151a29 0%, #0a0d14 55%)",
+  surface: "#111521",
+  surface2: "#161b2a",
+  raised: "#1b2133",
+  border: "#20263a",
+  borderLight: "#2c3450",
+  accent: "#7b7cf5",
+  accentDeep: "#5f5fe0",
+  accent2: "#4fd1c5",
+  supra: "#34d399",
+  warn: "#fbbf24",
+  danger: "#f87171",
+  text: "#eef0f8",
+  text2: "#9aa2c0",
+  muted: "#5a6180",
   display: "'Space Grotesk', 'Inter', sans-serif",
   sans: "'Inter', -apple-system, sans-serif",
   mono: "'JetBrains Mono', 'Space Mono', monospace",
