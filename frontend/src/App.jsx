@@ -787,18 +787,9 @@ export default function App() {
       isMobile={isMobile}
       isCompact={isCompact}
       channels={channels}
-      onSave={async (id, values) => {
-        const updated = await api.post(`/channels/${id}`, values);
-        setChannels(prev => prev.map(c => c.id === id ? (Array.isArray(updated) ? updated.find(u => u.id === id) : updated) : c));
-      }}
-      onToggle={async (id, enabled) => {
-        const updated = await api.post(`/channels/${id}`, { enabled });
-        setChannels(Array.isArray(updated) ? updated : Object.values(updated || {}));
-      }}
-      onTest={async (id) => {
-        try { return await api.post(`/channels/${id}/test`); }
-        catch { return { ok: false, error: "Erro de ligação" }; }
-      }}
+      onSave={onSaveChannel}
+      onToggle={toggleChannel}
+      onTest={onTestChannel}
     />
   );
 
