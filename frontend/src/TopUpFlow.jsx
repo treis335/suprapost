@@ -2,7 +2,7 @@ import { useState } from "react";
 import { C } from "./theme";
 import { depositSupra } from "./payment";
 
-// Componente reutilizável — usado no SetupPage e em qualquer lugar que precise de depósito
+// Reusable component — used in SetupPage and anywhere a deposit is needed
 export function TopUpFlow({ walletAddress, onCredited }) {
   const [amount, setAmount]   = useState(10);
   const [status, setStatus]   = useState(null);
@@ -21,7 +21,7 @@ export function TopUpFlow({ walletAddress, onCredited }) {
       if (result.txHash) setTxHash(result.txHash);
       onCredited?.();
     } else {
-      setError(result.error || "Falha no depósito");
+      setError(result.error || "Deposit failed");
       if (result.txHash) setTxHash(result.txHash);
     }
   }
@@ -32,27 +32,27 @@ export function TopUpFlow({ walletAddress, onCredited }) {
     return (
       <div className="scale-in">
         <div style={{ fontSize: "0.9rem", color: C.supra, fontWeight: 600, marginBottom: 8 }}>
-          ✓ {amount} SUPRA adicionados ao saldo
+          ✓ {amount} SUPRA added to balance
         </div>
         {txHash && (
           <div style={{ fontSize: "0.72rem", color: C.muted, marginBottom: 12 }}>
             <a href={`https://suprascan.io/tx/${txHash.replace("0x","")}`}
               target="_blank" rel="noreferrer" style={{ color: C.accent2, textDecoration: "none" }}>
-              Ver transação no SupraScan ↗
+              View transaction on SupraScan ↗
             </a>
           </div>
         )}
         <button onClick={reset} style={{
           all: "unset", cursor: "pointer", fontSize: "0.78rem", color: C.accent,
           fontWeight: 600, textDecoration: "underline",
-        }}>Fazer outro depósito</button>
+        }}>Make another deposit</button>
       </div>
     );
   }
 
   return (
     <div>
-      {/* Presets rápidos */}
+      {/* Quick presets */}
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
         {PRESETS.map((p) => (
           <button key={p} onClick={() => setAmount(p)} disabled={!!status} style={{
@@ -67,7 +67,7 @@ export function TopUpFlow({ walletAddress, onCredited }) {
         ))}
       </div>
 
-      {/* Input + botão */}
+      {/* Input + button */}
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <div style={{ position: "relative", flex: 1 }}>
           <input
@@ -123,10 +123,10 @@ export function TopUpFlow({ walletAddress, onCredited }) {
           {error}
           {txHash && (
             <div style={{ marginTop: 4, color: C.muted }}>
-              TX enviada —{" "}
+              TX sent —{" "}
               <a href={`https://suprascan.io/tx/${txHash.replace("0x","")}`}
                 target="_blank" rel="noreferrer" style={{ color: C.accent2 }}>
-                ver no explorer ↗
+                view on explorer ↗
               </a>
             </div>
           )}

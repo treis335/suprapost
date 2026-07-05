@@ -12,7 +12,7 @@ export function AutomationPage({
       {!isMobile && (
         <div>
           <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Automation</div>
-          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>Publica automaticamente em todos os canais activos, no horário que definires.</div>
+          <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 5 }}>Automatically posts to all active channels, on the schedule you set.</div>
         </div>
       )}
 
@@ -22,12 +22,12 @@ export function AutomationPage({
           running={automation.running}
           size={isMobile ? 150 : 188}
           label={automation.running ? (countdown || "—") : "Stopped"}
-          sublabel={automation.running ? "próximo post em" : "automação inativa"}
+          sublabel={automation.running ? "next post in" : "automation inactive"}
         />
         <div style={{ marginTop: 22 }}>
           {!automation.running
-            ? <Btn variant="primary" size="lg" onClick={active.length === 0 ? () => {} : startAuto} disabled={active.length === 0}>▶ Iniciar Automação</Btn>
-            : <Btn variant="danger" size="lg" onClick={stopAuto}>■ Parar</Btn>}
+            ? <Btn variant="primary" size="lg" onClick={active.length === 0 ? () => {} : startAuto} disabled={active.length === 0}>▶ Start Automation</Btn>
+            : <Btn variant="danger" size="lg" onClick={stopAuto}>■ Stop</Btn>}
         </div>
         <div style={{ marginTop: 16, display: "flex", justifyContent: "center", gap: 7, flexWrap: "wrap" }}>
           {active.length === 0 ? (
@@ -46,7 +46,7 @@ export function AutomationPage({
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
-        <Card eyebrow="Agendamento" title="Frequência de publicação">
+        <Card eyebrow="Scheduling" title="Posting frequency">
           <Select
             value={automation.cycleSeconds}
             onChange={(e) => saveAutomationSettings({ cycleSeconds: Number(e.target.value) })}

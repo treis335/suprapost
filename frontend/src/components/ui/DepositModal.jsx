@@ -97,7 +97,7 @@ export function DepositModal({ wallet, walletAddress, onCredited, onClose }) {
                   {amount} SUPRA adicionados!
                 </div>
                 <div style={{ fontSize: "0.78rem", color: C.text2, marginBottom: 16, lineHeight: 1.5 }}>
-                  O teu saldo foi atualizado.
+                  Your balance has been updated.
                 </div>
                 {txHash && (
                   <div style={{ marginBottom: 16 }}>
@@ -123,7 +123,7 @@ export function DepositModal({ wallet, walletAddress, onCredited, onClose }) {
               </div>
             ) : (
               <>
-                {/* Input + botão */}
+                {/* Input + button */}
                 <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                   <div style={{ position: "relative", flex: 1 }}>
                     <input
@@ -174,7 +174,7 @@ export function DepositModal({ wallet, walletAddress, onCredited, onClose }) {
                   </button>
                 </div>
 
-                {/* Presets rápidos */}
+                {/* Quick presets */}
                 <div style={{ display: "flex", gap: 6, marginBottom: error ? 12 : 0 }}>
                   {[10, 25, 50, 100].map((p) => (
                     <button key={p} onClick={() => setAmount(p)} disabled={!!status} style={{

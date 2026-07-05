@@ -33,19 +33,19 @@ const CHANNEL_INFO = {
     fields: [
       { key: "accessToken",  label: "Access Token",            placeholder: "" },
       { key: "igUserId",     label: "Account ID",              placeholder: "" },
-      { key: "imageBaseUrl", label: "URL pública para imagens", placeholder: "https://yourdomain.com" },
+      { key: "imageBaseUrl", label: "Public URL for images", placeholder: "https://yourdomain.com" },
     ],
     helpUrl: "https://developers.facebook.com/docs/instagram-platform",
   },
 };
 
-/* ── ChannelRow — componente completamente autónomo ── */
+/* ── ChannelRow — fully self-contained component ── */
 function ChannelRow({ id, channel, onSave, onToggle, onTest }) {
   const info = CHANNEL_INFO[id];
   const configured = channel?.configured ?? false;
   const enabled    = channel?.enabled    ?? false;
 
-  // Estado local — nunca é resetado pelo parent
+  // Local state — never reset by the parent
   const [creds, setCreds]         = useState(() => channel?.credentials ?? channel?.values ?? {});
   const [saving, setSaving]       = useState(false);
   const [testing, setTesting]     = useState(false);
@@ -55,7 +55,7 @@ function ChannelRow({ id, channel, onSave, onToggle, onTest }) {
   const isActive = configured && enabled;
   const isPaused = configured && !enabled;
   const statusColor = isActive ? C.supra : isPaused ? C.warn : C.muted;
-  const statusLabel = isActive ? "Ativo" : isPaused ? "Pausado" : "Por configurar";
+  const statusLabel = isActive ? "Active" : isPaused ? "Paused" : "Not set up";
 
   const setField = useCallback((key, val) => {
     setCreds(prev => ({ ...prev, [key]: val }));
@@ -116,7 +116,7 @@ function ChannelRow({ id, channel, onSave, onToggle, onTest }) {
           </div>
         </div>
 
-        {/* Toggle — só ativo se já configurado */}
+        {/* Toggle — only active if already configured */}
         <button
           onClick={handleToggle}
           disabled={!configured}
@@ -137,19 +137,19 @@ function ChannelRow({ id, channel, onSave, onToggle, onTest }) {
         </button>
       </div>
 
-      {/* Credenciais — sempre visíveis, nunca recolhem */}
+      {/* Credentials — always visible, never collapse */}
       <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 2 }}>
         <div style={{
           fontSize: "0.68rem", color: C.muted, fontFamily: C.mono,
           textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10,
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <span>{configured ? "Credenciais" : "Configurar ligação"}</span>
+          <span>{configured ? "Credentials" : "Set up connection"}</span>
           {info.helpUrl && (
             <a href={info.helpUrl} target="_blank" rel="noreferrer" style={{
               fontSize: "0.7rem", color: C.accent2, textDecoration: "none",
               fontWeight: 400, textTransform: "none", letterSpacing: 0,
-            }}>Onde encontro estas? ↗</a>
+            }}>Where do I find these? ↗</a>
           )}
         </div>
 
@@ -201,7 +201,7 @@ function ChannelRow({ id, channel, onSave, onToggle, onTest }) {
               transition: "all 0.2s", opacity: saving ? 0.6 : 1,
             }}
           >
-            {saving ? "A guardar…" : saved ? "✓ Guardado" : "Guardar"}
+            {saving ? "Saving…" : saved ? "✓ Saved" : "Save"}
           </button>
           <button
             onClick={handleTest}
@@ -215,7 +215,7 @@ function ChannelRow({ id, channel, onSave, onToggle, onTest }) {
               transition: "all 0.2s", opacity: testing || !configured ? 0.5 : 1,
             }}
           >
-            {testing ? "A testar…" : "Testar"}
+            {testing ? "Testing…" : "Test"}
           </button>
         </div>
 
@@ -228,8 +228,8 @@ function ChannelRow({ id, channel, onSave, onToggle, onTest }) {
             color: testResult.ok ? C.supra : C.danger,
           }}>
             {testResult.ok
-              ? "✓ Ligação bem-sucedida."
-              : `✕ ${testResult.error || testResult.reason || "Falha — verifica as credenciais."}`}
+              ? "✓ Connection successful."
+              : `✕ ${testResult.error || testResult.reason || "Failed — check your credentials."}`}
           </div>
         )}
       </div>
@@ -237,7 +237,7 @@ function ChannelRow({ id, channel, onSave, onToggle, onTest }) {
   );
 }
 
-/* ── ChannelsPanel — exportado para o App.jsx ── */
+/* ── ChannelsPanel — exported for App.jsx ── */
 export function ChannelsPanel({ isMobile, isCompact, channels, onSave, onToggle, onTest }) {
   const configured = channels.filter(c => c.configured && c.enabled).length;
 
@@ -245,11 +245,11 @@ export function ChannelsPanel({ isMobile, isCompact, channels, onSave, onToggle,
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: isMobile ? 16 : 20 }}>
       {!isMobile && (
         <div>
-          <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Canais</div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Channels</div>
           <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 4 }}>
             {configured > 0
-              ? `${configured} canal${configured > 1 ? "is" : ""} ativo${configured > 1 ? "s" : ""} — os posts serão publicados em todos.`
-              : "Liga as tuas redes sociais para começar a publicar automaticamente."}
+              ? `${configured} channel${configured > 1 ? "s" : ""} active — posts will be published to all of them.`
+              : "Connect your social networks to start posting automatically."}
           </div>
         </div>
       )}

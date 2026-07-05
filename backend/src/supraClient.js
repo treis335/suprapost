@@ -6,7 +6,7 @@ const OCTAS_PER_SUPRA = 1e8;
 async function getBalance(address) {
   const clean = address.startsWith("0x") ? address.slice(2) : address;
 
-  // Endpoint de recursos — mais fiável
+  // Resource endpoint — more reliable
   const coinType = "0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>";
   const url = `${RPC_BASE}/rpc/v1/accounts/${clean}/resources/${encodeURIComponent(coinType)}`;
 
@@ -41,8 +41,8 @@ async function getTransaction(txHash) {
 }
 
 /**
- * Extrai info de transferência de uma transação Supra.
- * Suporta múltiplos formatos de payload que a chain usa.
+ * Extracts transfer info from a Supra transaction.
+ * Supports multiple payload formats used by the chain.
  */
 function extractTransferInfo(tx) {
   try {
@@ -71,7 +71,7 @@ function extractTransferInfo(tx) {
       }
     }
 
-    // Formato 2: payload directo (algumas versões da API)
+    // Format 2: direct payload (some API versions)
     const payload = tx?.payload;
     if (payload && typeof payload === "object") {
       const fn = payload.function || payload.function_id || "";
@@ -93,7 +93,7 @@ function extractTransferInfo(tx) {
       }
     }
 
-    // Formato 3: events (fallback — procura evento Deposit)
+    // Format 3: events (fallback — looks for a Deposit event)
     const events = tx?.events || tx?.output?.Move?.events || [];
     for (const ev of events) {
       const type = ev?.type || "";

@@ -126,19 +126,19 @@ async function main() {
   // WALLET — balance, top-up
   // ════════════════════════════════════════════════════════
 
-  // GET /api/wallet — devolve o saldo interno da plataforma (créditos).
+  // GET /api/wallet — returns the platform's internal balance (credits).
   //
-  // IMPORTANTE: o saldo interno é SEPARADO do saldo on-chain do utilizador.
-  // Quando um utilizador faz depósito, envia SUPRA para o endereço da plataforma
-  // e nós creditamos o equivalente no saldo interno. O saldo on-chain do utilizador
-  // não é o nosso saldo — não faz sentido lê-lo aqui.
+  // IMPORTANT: the internal balance is SEPARATE from the user's on-chain balance.
+  // When a user makes a deposit, they send SUPRA to the platform address
+  // and we credit the equivalent to the internal balance. The user's on-chain balance
+  // is not our balance — it doesn't make sense to read it here.
   //
-  // ALLOW_SIMULATED_TOPUP=true → modo dev, saldo interno livre
-  // caso contrário              → saldo interno real (creditado via depósitos)
+  // ALLOW_SIMULATED_TOPUP=true → dev mode, free internal balance
+  // otherwise                    → real internal balance (credited via deposits)
   app.get("/api/wallet", requireAuth, async (req, res) => {
     await db.read();
     const user = db.forUser(req.walletAddress);
-    // Devolve directamente o saldo interno — nunca sobrescreve com saldo on-chain
+    // Returns the internal balance directly — never overwritten with the on-chain balance
     res.json(user.wallet);
   });
 
@@ -166,7 +166,7 @@ async function main() {
     });
   }
 
-  // GET /api/wallet/deposits — histórico de depósitos do utilizador
+  // GET /api/wallet/deposits — user's deposit history
   app.get("/api/wallet/deposits", requireAuth, async (req, res) => {
     await db.read();
     const user = db.forUser(req.walletAddress);

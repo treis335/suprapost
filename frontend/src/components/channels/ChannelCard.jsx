@@ -11,9 +11,9 @@ export function ChannelCard({ channel, onSave, onTest }) {
   const [testResult, setTestResult] = useState(null);
   const [saved, setSaved]         = useState(false);
 
-  // Sem useEffect de sincronização — o estado local é soberano.
-  // O polling do App.jsx não deve interferir com o que o user está a escrever.
-  // Os valores só mudam quando o user guarda (handleSave).
+  // No sync useEffect — local state is the source of truth.
+  // App.jsx polling should not interfere with what the user is typing.
+  // Values only change when the user saves (handleSave).
 
   function setField(key, val) {
     setValues((v) => ({ ...v, [key]: val }));
@@ -50,7 +50,7 @@ export function ChannelCard({ channel, onSave, onTest }) {
   const isPaused     = channel.configured && !enabled;
   const isComingSoon = channel.comingSoon;
   const statusColor  = isActive ? C.supra : isPaused ? C.warn : C.muted;
-  const statusLabel  = isComingSoon ? "Em breve" : isActive ? "Ativo" : isPaused ? "Pausado" : "Por configurar";
+  const statusLabel  = isComingSoon ? "Coming soon" : isActive ? "Active" : isPaused ? "Paused" : "Not set up";
 
   return (
     <Card
@@ -92,7 +92,7 @@ export function ChannelCard({ channel, onSave, onTest }) {
       {/* ── Coming soon ── */}
       {isComingSoon && (
         <div style={{ fontSize: "0.78rem", color: C.muted, lineHeight: 1.6 }}>
-          Integração disponível em breve.
+          Integration available soon.
         </div>
       )}
 
@@ -102,7 +102,7 @@ export function ChannelCard({ channel, onSave, onTest }) {
 
           {/* Section label */}
           <div style={{ fontSize: "0.68rem", color: C.muted, fontFamily: C.mono, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8 }}>
-            {channel.configured ? "Credenciais" : "Configurar ligação"}
+            {channel.configured ? "Credentials" : "Set up connection"}
           </div>
 
           {channel.fields.map((f) => (
@@ -147,14 +147,14 @@ export function ChannelCard({ channel, onSave, onTest }) {
               onClick={handleSave}
               disabled={!dirty || saving}
             >
-              {saving ? "A guardar…" : saved ? "✓ Guardado" : "Guardar"}
+              {saving ? "Saving…" : saved ? "✓ Saved" : "Save"}
             </Btn>
             <Btn
               variant="ghost" size="sm"
               onClick={handleTest}
               disabled={testing || (!channel.configured && !dirty)}
             >
-              {testing ? "A testar…" : "Testar ligação"}
+              {testing ? "Testing…" : "Test connection"}
             </Btn>
           </div>
 
@@ -168,8 +168,8 @@ export function ChannelCard({ channel, onSave, onTest }) {
               color: testResult.ok ? C.supra : C.danger,
             }}>
               {testResult.ok
-                ? "✓ Ligação bem-sucedida."
-                : `✕ ${testResult.error || testResult.reason || "Falha na ligação — verifica as credenciais."}`}
+                ? "✓ Connection successful."
+                : `✕ ${testResult.error || testResult.reason || "Connection failed — check your credentials."}`}
             </div>
           )}
         </div>

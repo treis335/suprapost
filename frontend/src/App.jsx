@@ -7,10 +7,10 @@ import { depositSupra } from "./payment";
 
 const TABS = [
   { id: "setup",      icon: "⚙",  label: "Setup" },
-  { id: "channels",   icon: "📡", label: "Canais" },
+  { id: "channels",   icon: "📡", label: "Channels" },
   { id: "compose",    icon: "✦",  label: "Compose" },
-  { id: "automation", icon: "⚡", label: "Automação" },
-  { id: "history",    icon: "📋", label: "Histórico" },
+  { id: "automation", icon: "⚡", label: "Automation" },
+  { id: "history",    icon: "📋", label: "History" },
 ];
 
 const fmt = (n) => Number(n ?? 0).toFixed(2);
@@ -623,8 +623,8 @@ export default function App() {
 
   useEffect(() => {
     if (!session) return;
-    // Carregar channels apenas uma vez — não fazem parte do polling
-    // para não interferir com o utilizador a escrever credenciais
+    // Load channels only once — not part of polling
+    // so we don't interfere with the user typing credentials
     api.get("/channels").then(ch => {
       const arr = Array.isArray(ch) ? ch : Object.values(ch || {});
       setChannels(arr);
@@ -652,7 +652,7 @@ export default function App() {
   async function saveSettings() {
     const updated = await api.post("/settings", settings);
     setSettings(updated);
-    showToast("Perfil guardado ✓");
+    showToast("Profile saved ✓");
   }
 
   async function toggleChannel(id, enabled) {
@@ -745,7 +745,7 @@ export default function App() {
         </div>
       </Card>
 
-      <Card id="deposit-section" eyebrow="Payments" title="Saldo SUPRA" accentTop={C.supra}>
+      <Card id="deposit-section" eyebrow="Payments" title="SUPRA Balance" accentTop={C.supra}>
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontFamily: C.mono, fontSize: "1.7rem", color: C.supra, fontWeight: 600 }}>
             {fmt(wallet.balance)} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span>
@@ -755,7 +755,7 @@ export default function App() {
         <div style={{ height: 1, background: C.border, marginBottom: 16 }} />
         <TopUpFlow walletAddress={session?.address} onCredited={refreshAll} />
         <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 14, lineHeight: 1.6 }}>
-          O teu saldo fica guardado na plataforma e é debitado por cada publicação.
+          Your balance is held on the platform and debited for each post.
         </div>
       </Card>
 
@@ -878,15 +878,15 @@ export default function App() {
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: isMobile ? 16 : 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          {!isMobile && <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>Histórico</div>}
-          <div style={{ fontSize: isMobile ? "0.95rem" : "0.85rem", color: isMobile ? C.text : C.muted, fontWeight: isMobile ? 700 : 400, marginTop: isMobile ? 0 : 5 }}>{posts.length} publicações no total</div>
+          {!isMobile && <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: C.display, letterSpacing: "-0.02em" }}>History</div>}
+          <div style={{ fontSize: isMobile ? "0.95rem" : "0.85rem", color: isMobile ? C.text : C.muted, fontWeight: isMobile ? 700 : 400, marginTop: isMobile ? 0 : 5 }}>{posts.length} total posts</div>
         </div>
         {historyTab === "posts" && <Btn variant="danger" size="sm" onClick={clearHistory}>Limpar tudo</Btn>}
       </div>
 
       {/* Tab switcher */}
       <div style={{ display: "flex", gap: 6, borderBottom: `1px solid ${C.border}`, paddingBottom: 0 }}>
-        {[["posts", "📝 Publicações"], ["deposits", "💳 Depósitos"]].map(([id, label]) => (
+        {[["posts", "📝 Posts"], ["deposits", "💳 Deposits"]].map(([id, label]) => (
           <button key={id} onClick={() => setHistoryTab(id)} style={{ all: "unset", cursor: "pointer", padding: "8px 16px", fontSize: "0.8rem", fontWeight: 600, color: historyTab === id ? C.text : C.muted, borderBottom: `2px solid ${historyTab === id ? C.accent : "transparent"}`, transition: "all 0.18s" }}>{label}</button>
         ))}
       </div>
@@ -906,7 +906,7 @@ export default function App() {
               {posts.map(p => (
                 <Card key={p.id}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 11, flexWrap: "wrap", gap: 6 }}>
-                    <Pill color={p.auto ? C.accent2 : C.accent}>{p.auto ? "↻ automático" : "✋ manual"}</Pill>
+                    <Pill color={p.auto ? C.accent2 : C.accent}>{p.auto ? "↻ automatic" : "✋ manual"}</Pill>
                     <span style={{ fontSize: "0.66rem", color: C.muted, fontFamily: C.mono }}>{new Date(p.time).toLocaleString()}</span>
                   </div>
                   <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6, marginBottom: 10 }}>{p.text.substring(0, 160)}{p.text.length > 160 ? "…" : ""}</div>
@@ -1011,7 +1011,7 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
           <Pill color={C.supra}>⬡ {fmt(wallet.balance)} SUPRA</Pill>
-          <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Automação ativa" : "Idle"}</Pill>
+          <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Automation active" : "Idle"}</Pill>
           <Pill color={C.accent2} title={session?.address}>{shortAddress(session?.address)}</Pill>
           <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sair</Btn>
         </div>

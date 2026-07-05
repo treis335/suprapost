@@ -3,7 +3,7 @@ const { getTransaction, extractTransferInfo, OCTAS_PER_SUPRA } = require("./supr
 
 /**
  * Non-custodial deposit flow — fingerprinted amount matching.
- * Ver comentário original para a explicação completa do design.
+ * See original comment for the full design explanation.
  */
 
 const DEPOSIT_ADDRESS = process.env.SUPRA_DEPOSIT_ADDRESS;
@@ -20,14 +20,14 @@ function encodeAmount(requestedAmount) {
 }
 
 function createDepositIntent(userAddress, requestedAmount) {
-  if (!DEPOSIT_ADDRESS) throw new Error("SUPRA_DEPOSIT_ADDRESS não configurado no servidor");
-  if (!requestedAmount || requestedAmount <= 0) throw new Error("Montante inválido");
+  if (!DEPOSIT_ADDRESS) throw new Error("SUPRA_DEPOSIT_ADDRESS not configured on the server");
+  if (!requestedAmount || requestedAmount <= 0) throw new Error("Invalid amount");
 
   const existing = [...pendingIntents.values()].filter(
     (i) => i.userAddress === userAddress.toLowerCase() && !i.fulfilled && Date.now() < i.expiresAt
   );
   if (existing.length >= MAX_PENDING_PER_USER) {
-    throw new Error("Demasiados depósitos pendentes — aguarda ou espera que expirem");
+    throw new Error("Too many pending deposits — wait or let them expire");
   }
 
   const { encoded } = encodeAmount(requestedAmount);
@@ -67,7 +67,7 @@ async function pollForDeposits(db) {
   try {
     txData = await getAccountTransactions(DEPOSIT_ADDRESS, { count: 25 });
   } catch (err) {
-    console.error("[deposits] Erro ao buscar txs:", err.message);
+    console.error("[deposits] Error fetching txs:", err.message);
     return [];
   }
 
@@ -111,11 +111,11 @@ async function pollForDeposits(db) {
 }
 
 /**
- * Confirma depósito via txHash que o browser enviou.
- * Verifica o montante na chain e credita o utilizador.
+ * Confirms deposit via txHash sent by the browser.
+ * Verifies the amount on-chain and credits the user.
  *
- * Modo permissivo: se a chain não for acessível, confia no intent
- * (o fingerprint único já é suficiente protecção contra double-credit).
+ * Permissive mode: if the chain is not reachable, trust the intent
+ * (the unique fingerprint is already sufficient protection against double-crediting).
  */
 async function confirmDepositByTxHash(db, intent, txHash) {
   if (intent.fulfilled) return { ok: true, alreadyCredited: true };
@@ -125,30 +125,30 @@ async function confirmDepositByTxHash(db, intent, txHash) {
     txData = await getTransaction(txHash);
     console.log("[deposits] TX data:", JSON.stringify(txData).slice(0, 300));
   } catch (err) {
-    console.warn("[deposits] Não foi possível buscar TX, modo permissivo:", err.message);
+    console.warn("[deposits] Could not fetch TX, permissive mode:", err.message);
   }
 
   if (txData) {
     const info = extractTransferInfo(txData);
     if (!info) {
-      // Se não conseguimos parsear mas temos tx data, pode ser formato desconhecido
-      // Log para diagnóstico mas não bloquear — o fingerprint já valida
-      console.warn("[deposits] Não consegui parsear tx, a creditar na mesma. TX:", JSON.stringify(txData).slice(0, 200));
+      // If we couldn't parse it but have tx data, it may be an unknown format
+      // Log for diagnostics but don't block — the fingerprint already validates
+      console.warn("[deposits] Could not parse tx, crediting anyway. TX:", JSON.stringify(txData).slice(0, 200));
     } else {
       const amountSupra = +(Number(info.amountOctas) / OCTAS_PER_SUPRA).toFixed(8);
       const expected = +intent.encodedAmount.toFixed(8);
-      // Tolerância de 2 octas para arredondamentos
+      // 2-octa tolerance for rounding
       if (Math.abs(amountSupra - expected) > 2e-8) {
-        console.warn(`[deposits] Montante errado: esperado ${expected}, recebido ${amountSupra}`);
+        console.warn(`[deposits] Wrong amount: expected ${expected}, received ${amountSupra}`);
         return {
           ok: false,
-          error: `Montante não corresponde: esperado ${expected} SUPRA, recebido ${amountSupra} SUPRA`,
+          error: `Amount mismatch: expected ${expected} SUPRA, received ${amountSupra} SUPRA`,
         };
       }
     }
   }
 
-  // Creditar e guardar no histórico
+  // Credit and save to history
   await db.read();
   const user = db.forUser(intent.userAddress);
   user.wallet.balance = +(user.wallet.balance + intent.requestedAmount).toFixed(8);
@@ -160,7 +160,7 @@ async function confirmDepositByTxHash(db, intent, txHash) {
     txHash:        txHash,
     createdAt:     Date.now(),
   });
-  // Manter apenas os últimos 50 depósitos
+  // Keep only the last 50 deposits
   if (user.wallet.deposits.length > 50) user.wallet.deposits = user.wallet.deposits.slice(0, 50);
   await db.write();
 

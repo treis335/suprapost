@@ -4,15 +4,15 @@
  * Envia SUPRA usando a StarKey wallet.
  * Testado contra a API real da StarKey (Jun 2026).
  *
- * A StarKey expõe window.starkey.supra com os métodos:
- *   - connect()                    → retorna array de endereços
- *   - account()                    → endereço actual
+ * StarKey exposes window.starkey.supra with the methods:
+ *   - connect()                    → returns array of addresses
+ *   - account()                    → current address
  *   - sendTransaction(txObject)    → retorna txHash string
  *   - signMessage(Uint8Array)      → { signature, publicKey }
  *
- * O formato correcto de sendTransaction para transferência SUPRA é:
+ * The correct sendTransaction format for a SUPRA transfer is:
  *   { data: <hex string do payload BCS serializado>  }
- * OU o formato simplificado de algumas versões:
+ * OR the simplified format used by some versions:
  *   { from, to, value (em octas como string) }
  */
 
@@ -53,12 +53,12 @@ async function apiConfirmDeposit(intentId, txHash) {
 /**
  * Envia SUPRA via StarKey.
  *
- * Tenta 3 formatos por ordem de probabilidade de sucesso,
- * registando qual funcionou para diagnóstico.
+ * Tries 3 formats in order of likelihood of success,
+ * logging which one worked for diagnostics.
  */
 async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
   const provider = getProvider();
-  if (!provider) throw new Error("StarKey não detectada — instala em starkey.app");
+  if (!provider) throw new Error("StarKey not detected — install it from starkey.app");
 
   const amountOctas = Math.round(amountSupra * OCTAS_PER_SUPRA);
   const amountOctasStr = amountOctas.toString();
@@ -71,8 +71,8 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
     octas: amountOctas,
   });
 
-  // ── Formato 1: transferCoin (API de alto nível — mais fiável) ──────────────
-  // Algumas versões da StarKey têm este método nativo de transferência
+  // ── Format 1: transferCoin (high-level API — more reliable) ──────────────
+  // Some StarKey versions have this native transfer method
   if (typeof provider.transferCoin === "function") {
     try {
       console.log("[payment] Tentando provider.transferCoin()...");
@@ -87,12 +87,12 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
         return hash;
       }
     } catch (e) {
-      console.warn("[payment] transferCoin falhou:", e.message);
+      console.warn("[payment] transferCoin failed:", e.message);
     }
   }
 
   // ── Formato 2: sendTransaction com objeto simples ──────────────────────────
-  // Funciona na maioria das versões recentes da StarKey
+  // Works on most recent StarKey versions
   if (typeof provider.sendTransaction === "function") {
     // Formato 2a: from/to/value
     try {
@@ -108,7 +108,7 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
         return hash;
       }
     } catch (e) {
-      console.warn("[payment] sendTransaction 2a falhou:", e.message);
+      console.warn("[payment] sendTransaction 2a failed:", e.message);
     }
 
     // Formato 2b: data com payload Move serializado via createRawTransactionData
@@ -158,11 +158,11 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
           return hash;
         }
       } catch (e) {
-        console.warn("[payment] sendTransaction 2b falhou:", e.message);
+        console.warn("[payment] sendTransaction 2b failed:", e.message);
       }
     }
 
-    // Formato 2c: payload Move em formato JSON legível (algumas versões aceitam)
+    // Format 2c: Move payload in readable JSON format (some versions accept this)
     try {
       console.log("[payment] Tentando sendTransaction com payload Move JSON...");
       const result = await provider.sendTransaction({
@@ -179,14 +179,14 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
         return hash;
       }
     } catch (e) {
-      console.warn("[payment] sendTransaction 2c falhou:", e.message);
+      console.warn("[payment] sendTransaction 2c failed:", e.message);
     }
   }
 
   throw new Error(
-    "Não foi possível enviar a transação via StarKey. " +
+    "Could not send the transaction via StarKey. " +
     "Verifica a consola do browser para detalhes. " +
-    "Assegura que a StarKey está actualizada e tem SUPRA suficiente."
+    "Make sure StarKey is up to date and has enough SUPRA."
   );
 }
 
@@ -196,15 +196,15 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
 export async function depositSupra(walletAddress, amountSupra, onStatus = () => {}) {
   try {
     // 1. Criar intent no backend
-    onStatus({ step: "intent", message: "A criar depósito..." });
+    onStatus({ step: "intent", message: "Creating deposit..." });
     const intentRes = await apiCreateIntent(amountSupra);
     if (!intentRes.ok) {
-      return { ok: false, error: intentRes.error || "Erro ao criar depósito" };
+      return { ok: false, error: intentRes.error || "Error creating deposit" };
     }
     const intent = intentRes.intent;
     console.log("[payment] Intent criado:", intent);
 
-    // 2. Enviar TX via StarKey
+    // 2. Send TX via StarKey
     onStatus({
       step: "sending",
       message: `Confirma ${intent.encodedAmount} SUPRA na StarKey...`,
@@ -226,21 +226,21 @@ export async function depositSupra(walletAddress, amountSupra, onStatus = () => 
       return {
         ok: false,
         error: userRejected
-          ? "Transação cancelada na StarKey"
+          ? "Transaction cancelled in StarKey"
           : `StarKey: ${err.message}`,
       };
     }
 
     // 3. Confirmar no backend
-    onStatus({ step: "confirming", message: "A verificar transação na chain..." });
+    onStatus({ step: "confirming", message: "Verifying transaction on chain..." });
     const confirmRes = await apiConfirmDeposit(intent.id, txHash);
     if (!confirmRes.ok) {
-      // Tx enviada mas o backend não confirmou — mostrar o hash para referência
+      // Tx sent but the backend didn't confirm — show the hash for reference
       return {
         ok: false,
-        error: confirmRes.error || "Backend não conseguiu confirmar",
+        error: confirmRes.error || "Backend could not confirm",
         txHash,
-        // Se foi erro de verificação de montante, pode ser que o backend precise de tempo
+        // If it was an amount-verification error, the backend may just need more time
         retryable: true,
       };
     }
@@ -249,10 +249,10 @@ export async function depositSupra(walletAddress, amountSupra, onStatus = () => 
     return { ok: true, credited: intent.requestedAmount, txHash };
 
   } catch (err) {
-    console.error("[payment] depositSupra erro geral:", err);
+    console.error("[payment] depositSupra general error:", err);
     return {
       ok: false,
-      error: err.message || "Erro desconhecido",
+      error: err.message || "Unknown error",
     };
   }
 }
