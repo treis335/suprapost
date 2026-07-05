@@ -79,6 +79,28 @@ const STATS = [
   { value: "0", label: "API keys required to start" },
 ];
 
+const PLATFORMS = [
+  { id: "telegram", name: "Telegram", color: "#34b7eb", path: "M21.05 3.16 2.9 10.36c-1.24.5-1.23 1.2-.23 1.5l4.65 1.45 1.8 5.53c.22.6.11.84.75.84.5 0 .72-.23 1-.5l2.4-2.33 4.98 3.68c.92.5 1.58.24 1.82-.85l3.28-15.47c.36-1.33-.5-1.93-1.3-1.55Z" },
+  { id: "twitter", name: "X", color: "#e7e9ea", path: "M18.9 3H22l-7.4 8.4L23 21h-6.8l-5.3-6.9L4.7 21H1.6l7.9-9L1 3h7l4.8 6.3L18.9 3Zm-1.2 16.2h1.9L7.4 4.7H5.3l12.4 14.5Z" },
+  { id: "discord", name: "Discord", color: "#5865F2", path: "M19.5 5.7A17 17 0 0 0 15.4 4.4c-.2.35-.4.8-.55 1.16a15.8 15.8 0 0 0-4.7 0c-.15-.36-.36-.81-.56-1.16A17 17 0 0 0 5.5 5.7C2.7 9.8 1.95 13.8 2.3 17.75a17.1 17.1 0 0 0 5.2 2.6c.42-.57.8-1.18 1.1-1.83a11 11 0 0 1-1.75-.83c.15-.1.3-.22.43-.33a12.2 12.2 0 0 0 10.4 0c.15.11.28.23.44.33-.56.33-1.15.6-1.76.83.32.65.68 1.26 1.1 1.83a17 17 0 0 0 5.2-2.6c.42-4.58-.72-8.55-3.16-12.05ZM9.7 15.35c-1.05 0-1.9-.95-1.9-2.13 0-1.17.83-2.13 1.9-2.13 1.06 0 1.92.96 1.9 2.13 0 1.18-.84 2.13-1.9 2.13Zm5.6 0c-1.05 0-1.9-.95-1.9-2.13 0-1.17.84-2.13 1.9-2.13 1.06 0 1.92.96 1.9 2.13 0 1.18-.83 2.13-1.9 2.13Z" },
+  { id: "instagram", name: "Instagram", color: "#E1306C", path: "M12 2.2c3.2 0 3.58.01 4.85.07 1.17.06 1.97.24 2.43.42.55.2.94.46 1.36.87.4.42.66.8.87 1.36.18.46.36 1.26.42 2.43.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.06 1.17-.24 1.97-.42 2.43-.2.55-.46.94-.87 1.36-.42.4-.8.66-1.36.87-.46.18-1.26.36-2.43.42-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.06-1.97-.24-2.43-.42a3.7 3.7 0 0 1-1.36-.87 3.7 3.7 0 0 1-.87-1.36c-.18-.46-.36-1.26-.42-2.43C2.21 15.58 2.2 15.2 2.2 12s.01-3.58.07-4.85c.06-1.17.24-1.97.42-2.43.2-.55.46-.94.87-1.36.42-.4.8-.66 1.36-.87.46-.18 1.26-.36 2.43-.42C8.42 2.21 8.8 2.2 12 2.2Zm0 1.98c-3.15 0-3.5.01-4.73.07-1 .05-1.55.21-1.9.35-.48.19-.82.41-1.18.77-.36.36-.58.7-.77 1.18-.14.36-.3.9-.35 1.9-.06 1.23-.07 1.58-.07 4.73s.01 3.5.07 4.73c.05 1 .21 1.55.35 1.9.19.48.41.82.77 1.18.36.36.7.58 1.18.77.36.14.9.3 1.9.35 1.23.06 1.58.07 4.73.07s3.5-.01 4.73-.07c1-.05 1.55-.21 1.9-.35.48-.19.82-.41 1.18-.77.36-.36.58-.7.77-1.18.14-.36.3-.9.35-1.9.06-1.23.07-1.58.07-4.73s-.01-3.5-.07-4.73c-.05-1-.21-1.55-.35-1.9a3.16 3.16 0 0 0-.77-1.18 3.16 3.16 0 0 0-1.18-.77c-.36-.14-.9-.3-1.9-.35-1.23-.06-1.58-.07-4.73-.07Zm0 3.38a4.44 4.44 0 1 1 0 8.88 4.44 4.44 0 0 1 0-8.88Zm0 1.98a2.46 2.46 0 1 0 0 4.92 2.46 2.46 0 0 0 0-4.92Zm4.62-2.2a1.04 1.04 0 1 1 0 2.08 1.04 1.04 0 0 1 0-2.08Z" },
+];
+
+const CONSOLE_LINES = [
+  { t: "> reading profile: niche=\"DeFi\", tone=\"technical\"", c: "muted" },
+  { t: "✓ draft generated (deepseek)", c: "accent2" },
+  { t: "✓ self-critique score: 8.7/10 — approved", c: "supra" },
+  { t: "→ posting to telegram, twitter, discord", c: "text2" },
+  { t: "✓ published · 1.00 SUPRA charged", c: "accent" },
+  { t: "… next cycle in 00:29:41", c: "muted" },
+];
+
+const EXAMPLE_POSTS = [
+  { platform: "telegram", tag: "✈ Telegram", text: "Stop trading noise. Start building signal. Supra fundamentals have never been stronger — on-chain data doesn't lie. 📈" },
+  { platform: "twitter", tag: "𝕏 X", text: "GM builders ☀️ Shipping is the only alpha. What are you building on Supra this week?" },
+  { platform: "discord", tag: "🎮 Discord", text: "New week, new milestones. The roadmap update is live in #announcements — feedback welcome!" },
+];
+
 export function LandingPage({ onEnter }) {
   const { stage, progress } = useCycle();
   const [scrolled, setScrolled] = useState(false);
@@ -182,6 +204,23 @@ export function LandingPage({ onEnter }) {
           </Reveal>
         </Section>
 
+        {/* ── Platform logos ─────────────────────────────────── */}
+        <Section style={{ padding: "0 24px 70px" }}>
+          <Reveal>
+            <div style={{ textAlign: "center", fontSize: "0.72rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 22 }}>
+              Publishes straight to
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "14px 36px" }}>
+              {PLATFORMS.map(p => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 9, opacity: 0.9 }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill={p.color}><path d={p.path} /></svg>
+                  <span style={{ fontSize: "0.92rem", color: C.text2, fontWeight: 500 }}>{p.name}</span>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+        </Section>
+
         <Section id="how" style={{ padding: "60px 24px 90px" }}>
           <Reveal>
             <div style={{ fontFamily: C.mono, fontSize: "0.7rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>How it works</div>
@@ -215,6 +254,45 @@ export function LandingPage({ onEnter }) {
                   }}>{f.icon}</div>
                   <div style={{ fontWeight: 600, marginBottom: 8, fontSize: "1rem" }}>{f.title}</div>
                   <div style={{ fontSize: "0.87rem", color: C.text2, lineHeight: 1.58 }}>{f.body}</div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </Section>
+
+        {/* ── Live console ────────────────────────────────────── */}
+        <Section style={{ padding: "0 24px 90px" }}>
+          <Reveal>
+            <div style={{ fontFamily: C.mono, fontSize: "0.7rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>What's happening under the hood</div>
+            <h2 style={{ fontFamily: C.display, fontSize: "1.7rem", fontWeight: 600, margin: "0 0 28px", letterSpacing: "-0.015em" }}>One cycle, start to finish.</h2>
+            <div style={{
+              background: "#0a0d14", border: `1px solid ${C.border}`, borderRadius: 16, padding: "20px 24px",
+              boxShadow: "0 24px 50px -28px rgba(0,0,0,0.6)", maxWidth: 640,
+            }}>
+              <div style={{ display: "flex", gap: 7, marginBottom: 16 }}>
+                <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#ff5f56" }} />
+                <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#ffbd2e" }} />
+                <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#27c93f" }} />
+              </div>
+              {CONSOLE_LINES.map((l, i) => (
+                <div key={i} style={{ fontFamily: C.mono, fontSize: "0.83rem", color: C[l.c] || C.text2, lineHeight: 1.9 }}>{l.t}</div>
+              ))}
+            </div>
+          </Reveal>
+        </Section>
+
+        {/* ── Example posts ───────────────────────────────────── */}
+        <Section style={{ padding: "0 24px 90px" }}>
+          <Reveal>
+            <div style={{ fontFamily: C.mono, fontSize: "0.7rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>Examples</div>
+            <h2 style={{ fontFamily: C.display, fontSize: "1.7rem", fontWeight: 600, margin: "0 0 28px", letterSpacing: "-0.015em" }}>What the AI actually writes.</h2>
+          </Reveal>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 18 }}>
+            {EXAMPLE_POSTS.map((p, idx) => (
+              <Reveal key={p.tag} delay={idx * 0.08}>
+                <div className="feature-card" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 22, height: "100%", boxSizing: "border-box" }}>
+                  <div style={{ fontSize: "0.72rem", color: C.muted, fontWeight: 600, marginBottom: 12 }}>{p.tag}</div>
+                  <div style={{ fontSize: "0.9rem", color: C.text, lineHeight: 1.6 }}>{p.text}</div>
                 </div>
               </Reveal>
             ))}
