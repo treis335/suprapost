@@ -1045,7 +1045,7 @@ export default function App() {
           <div style={{ fontSize: "0.62rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.15em", padding: "18px 14px 9px" }}>Channels</div>
           <Card style={{ padding: 16 }}>
             <div style={{ fontFamily: C.mono, fontSize: "1.15rem", color: C.accent, fontWeight: 600 }}>{enabledChannelCount} active</div>
-            <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 3 }}>of {Object.keys(CHANNEL_INFO).length} platforms</div>
+            <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 3 }}>of {channels.length} platforms</div>
           </Card>
         </div>
 
