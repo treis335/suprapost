@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "./theme";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 import { ComposePage } from "./pages/ComposePage";
+import { ReferralPage } from "./pages/ReferralPage";
 import { ChannelsPanel } from "./pages/ChannelsPage";
 import { LandingPage } from "./pages/LandingPage";
 import { depositSupra } from "./payment";
@@ -12,6 +13,7 @@ const TABS = [
   { id: "compose",    icon: "✦",  label: "Compose" },
   { id: "automation", icon: "⚡", label: "Automation" },
   { id: "history",    icon: "📋", label: "History" },
+  { id: "referral",   icon: "⬡",  label: "Referrals" },
 ];
 
 const fmt = (n) => Number(n ?? 0).toFixed(2);
@@ -961,8 +963,6 @@ export default function App() {
         </div>
       </Card>
 
-      <ReferralCard walletAddress={session?.address} />
-
       <Card eyebrow="Voice & Content" title="Content Profile">
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "0 18px" }}>
           <Field label="Niche / Topic"><Input placeholder="e.g. DeFi, Supra blockchain, trading" value={settings.niche} onChange={e => updateSetting("niche", e.target.value)} onBlur={saveSettings} /></Field>
@@ -1147,7 +1147,10 @@ export default function App() {
       tweet={tweet} setTweet={setTweet} scores={scores} genLog={genLog} onPost={onPost} />
   );
 
-  const panels = { setup: Setup, channels: Channels, compose: Generate, automation: Automation, history: History };
+  const Referral = (
+    <ReferralPage walletAddress={session?.address} isMobile={isMobile} />
+  );
+  const panels = { setup: Setup, channels: Channels, compose: Generate, automation: Automation, history: History, referral: Referral };
 
   if (showLanding && !session) return <LandingPage onEnter={() => setShowLanding(false)} />;
   if (!session) return <LoginScreen onSignedIn={setSession} isMobile={isMobile} />;
