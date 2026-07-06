@@ -54,11 +54,22 @@ Rules:
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
-        timeout: 20000,
+        timeout: 30000,
+        // Prevent axios from trying to parse truncated JSON responses
+        validateStatus: (status) => status < 500,
       }
     );
 
-    const text = res.data.choices[0].message.content.trim();
+    // Defensive parsing — DeepSeek can return empty or malformed responses
+    const data = typeof res.data === "string" ? (() => {
+      try { return JSON.parse(res.data); } catch { return null; }
+    })() : res.data;
+
+    const text = data?.choices?.[0]?.message?.content?.trim();
+    if (!text) {
+      console.warn("[deepseek] Empty response from API, using fallback. Status:", res.status);
+      return pickFallback();
+    }
     return text;
   } catch (err) {
     console.error("[deepseek] API error:", err.response?.data || err.message);
