@@ -111,7 +111,7 @@ export async function signInWithWallet() {
 
   if (!result.ok) throw new Error(result.error || "Sign-in verification failed");
 
-  const session = { address: result.address, token: result.token };
+  const session = { address: result.address, token: result.token, isAdmin: !!result.isAdmin };
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
   return session;
 }

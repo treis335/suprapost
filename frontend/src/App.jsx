@@ -3,6 +3,7 @@ import { C } from "./theme";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 import { ComposePage } from "./pages/ComposePage";
 import { ReferralPage } from "./pages/ReferralPage";
+import { AdminPage } from "./pages/AdminPage";
 import { ChannelsPanel } from "./pages/ChannelsPage";
 import { LandingPage } from "./pages/LandingPage";
 import { depositSupra } from "./payment";
@@ -1150,7 +1151,9 @@ export default function App() {
   const Referral = (
     <ReferralPage walletAddress={session?.address} isMobile={isMobile} />
   );
-  const panels = { setup: Setup, channels: Channels, compose: Generate, automation: Automation, history: History, referral: Referral };
+  const Admin = <AdminPage walletAddress={session?.address} />;
+  const panels = { setup: Setup, channels: Channels, compose: Generate, automation: Automation, history: History, referral: Referral, admin: Admin };
+  const visibleTabs = session?.isAdmin ? [...TABS, { id: "admin", icon: "🛠", label: "Admin" }] : TABS;
 
   if (showLanding && !session) return <LandingPage onEnter={() => setShowLanding(false)} />;
   if (!session) return <LoginScreen onSignedIn={setSession} isMobile={isMobile} />;
@@ -1175,7 +1178,7 @@ export default function App() {
         </div>
         <div key={tab} className="fade-up" style={{ flex: 1, padding: "18px 16px 96px", overflowY: "auto" }}>{panels[tab]}</div>
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(16,14,26,0.9)", backdropFilter: "blur(12px)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
-          {TABS.map(({ id, icon, label }) => (
+          {visibleTabs.map(({ id, icon, label }) => (
             <div key={id} onClick={() => setTab(id)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "11px 0 9px", cursor: "pointer", color: tab === id ? C.accent : C.muted, borderTop: `2px solid ${tab === id ? C.accent : "transparent"}`, transition: "all 0.2s" }}>
               <span style={{ fontSize: "1.2rem" }}>{icon}</span>
               <span style={{ fontSize: "0.62rem", marginTop: 4, fontWeight: 600 }}>{label}</span>
@@ -1203,7 +1206,7 @@ export default function App() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 6, padding: "12px 24px 0", borderBottom: `1px solid ${C.border}` }}>
-          {TABS.map(({ id, icon, label }) => (
+          {visibleTabs.map(({ id, icon, label }) => (
             <div key={id} onClick={() => setTab(id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", borderRadius: "10px 10px 0 0", cursor: "pointer", fontSize: "0.84rem", fontWeight: 500, color: tab === id ? C.text : C.text2, background: tab === id ? C.surface : "transparent", borderBottom: tab === id ? `2px solid ${C.accent}` : "2px solid transparent" }}>
               <span>{icon}</span> {label}
             </div>
@@ -1236,7 +1239,7 @@ export default function App() {
       <div style={{ display: "grid", gridTemplateColumns: "252px 1fr 296px", flex: 1, minHeight: 0 }}>
         {/* Sidebar */}
         <div style={{ borderRight: `1px solid ${C.border}`, padding: "24px 16px", display: "flex", flexDirection: "column", gap: 5 }}>
-          {TABS.map(({ id, icon, label }) => (
+          {visibleTabs.map(({ id, icon, label }) => (
             <div key={id} onClick={() => setTab(id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 14px", borderRadius: 10, cursor: "pointer", fontSize: "0.88rem", fontWeight: 500, color: tab === id ? C.text : C.text2, background: tab === id ? `linear-gradient(135deg, ${C.accent}26, ${C.accent}0d)` : "transparent", border: `1px solid ${tab === id ? C.accent + "40" : "transparent"}`, transition: "all 0.18s" }}>
               <span style={{ fontSize: "1.05rem", width: 18, textAlign: "center" }}>{icon}</span> {label}
             </div>

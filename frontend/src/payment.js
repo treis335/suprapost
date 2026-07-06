@@ -257,4 +257,4 @@ export async function depositSupra(walletAddress, amountSupra, onStatus = () => 
   }
 }
 
-export { getProvider };
+export { getProvider, sendSupraTransfer };
