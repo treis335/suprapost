@@ -58,4 +58,31 @@ async function requestWithdrawal(db, address, amount, toAddress) {
   return { ok: true, withdrawal: record, creditBalance: user.wallet.creditBalance };
 }
 
-module.exports = { requestWithdrawal, MIN_WITHDRAWAL };
+function listAllPending(db) {
+  const out = [];
+  for (const [address, user] of Object.entries(db.data.users || {})) {
+    for (const w of user.wallet?.withdrawals || []) {
+      if (w.status === "pending") out.push({ ...w, address });
+    }
+  }
+  return out.sort((a, b) => a.createdAt - b.createdAt);
+}
+
+async function markWithdrawal(db, address, withdrawalId, status, txHash) {
+  await db.read();
+  const user = db.forUser(address);
+  const w = (user.wallet.withdrawals || []).find(x => x.id === withdrawalId);
+  if (!w) return { ok: false, error: "Withdrawal not found." };
+  if (w.status !== "pending") return { ok: false, error: `Already ${w.status}.` };
+
+  if (status === "rejected") {
+    user.wallet.creditBalance = +((user.wallet.creditBalance || 0) + w.amount).toFixed(8);
+  }
+  w.status = status;
+  w.txHash = txHash || null;
+  w.resolvedAt = Date.now();
+  await db.write();
+  return { ok: true, withdrawal: w };
+}
+
+module.exports = { requestWithdrawal, listAllPending, markWithdrawal, MIN_WITHDRAWAL };

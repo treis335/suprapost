@@ -10,7 +10,7 @@ const { startAutomation, stopAutomation, resumeAllAutomations } = require("./sch
 const { publishToChannels } = require("./channels");
 const { createNonce, verifyAndIssueToken, requireAuth, getPendingRef } = require("./auth");
 const { createDepositIntent, getIntentStatus, pollForDeposits, confirmDepositByTxHash } = require("./deposits");
-const { requestWithdrawal } = require("./withdrawals");
+const { requestWithdrawal, listAllPending, markWithdrawal } = require("./withdrawals");
 const { cleanOldImages, IMAGES_DIR } = require("./imageGen");
 
 const PORT = process.env.PORT || 3001;
@@ -225,6 +225,29 @@ async function main() {
     await db.read();
     const user = db.forUser(req.walletAddress);
     res.json({ ok: true, withdrawals: user.wallet.withdrawals || [] });
+  });
+
+  // ── Admin: manual withdrawal payouts ──
+  // Protected by ADMIN_SECRET (set it in .env). Not for end users.
+  function requireAdmin(req, res, next) {
+    const key = req.headers["x-admin-secret"];
+    if (!process.env.ADMIN_SECRET || key !== process.env.ADMIN_SECRET) {
+      return res.status(403).json({ ok: false, error: "Forbidden" });
+    }
+    next();
+  }
+
+  app.get("/api/admin/withdrawals", requireAdmin, async (req, res) => {
+    await db.read();
+    res.json({ ok: true, withdrawals: listAllPending(db) });
+  });
+
+  app.post("/api/admin/withdrawals/:address/:id", requireAdmin, async (req, res) => {
+    const { status, txHash } = req.body; // status: "paid" | "rejected"
+    if (!["paid", "rejected"].includes(status)) return res.status(400).json({ ok: false, error: "status must be paid or rejected" });
+    const result = await markWithdrawal(db, req.params.address, req.params.id, status, txHash);
+    if (!result.ok) return res.status(400).json(result);
+    res.json(result);
   });
 
   // ── Real, non-custodial deposits ──
