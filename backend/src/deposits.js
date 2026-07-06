@@ -9,6 +9,7 @@ const { getTransaction, extractTransferInfo, OCTAS_PER_SUPRA } = require("./supr
 const DEPOSIT_ADDRESS = process.env.SUPRA_DEPOSIT_ADDRESS;
 const INTENT_TTL_MS = 30 * 60 * 1000; // 30 min
 const MAX_PENDING_PER_USER = 5;
+const REFERRAL_COMMISSION_RATE = 0.10; // 10% of every deposit, credited to the referrer's creditBalance
 
 // In-memory: encodedAmount.toFixed(8) → intent object
 const pendingIntents = new Map();
@@ -90,6 +91,19 @@ async function pollForDeposits(db) {
     await db.read();
     const user = db.forUser(intent.userAddress);
     user.wallet.balance = +(user.wallet.balance + intent.requestedAmount).toFixed(8);
+
+    // ── Referral commission: 10% credited to referrer's credit balance ──
+    const referredBy = user.referral?.referredBy;
+    if (referredBy) {
+      const referrer = db.forUser(referredBy);
+      const commission = +(intent.requestedAmount * REFERRAL_COMMISSION_RATE).toFixed(8);
+      referrer.wallet = referrer.wallet || {};
+      referrer.wallet.creditBalance = +((referrer.wallet.creditBalance || 0) + commission).toFixed(8);
+      referrer.referral = referrer.referral || {};
+      referrer.referral.referralEarned = +((referrer.referral.referralEarned || 0) + commission).toFixed(8);
+      console.log(`[referral] ${commission} SUPRA commission → ${referredBy} (from deposit by ${intent.userAddress})`);
+    }
+
     await db.write();
 
     if (!Array.isArray(user.wallet.deposits)) user.wallet.deposits = [];
@@ -104,7 +118,7 @@ async function pollForDeposits(db) {
     intent.fulfilled = true;
     intent.txHash = tx.hash;
     fulfilled.push(intent);
-    console.log(`[deposits] Creditado ${intent.requestedAmount} SUPRA a ${intent.userAddress} (tx ${tx.hash})`);
+    console.log(`[deposits] Credited ${intent.requestedAmount} SUPRA to ${intent.userAddress} (tx ${tx.hash})`);
   }
 
   return fulfilled;
@@ -163,16 +177,15 @@ async function confirmDepositByTxHash(db, intent, txHash) {
   // Keep only the last 50 deposits
   if (user.wallet.deposits.length > 50) user.wallet.deposits = user.wallet.deposits.slice(0, 50);
 
-  // ── Referral commission: 10% credited to referrer ─────────────────────
-  const COMMISSION_RATE = 0.10;
+  // ── Referral commission: 10% credited to referrer's credit balance ────
   const referredBy = user.referral?.referredBy;
   let commissionPaid = 0;
 
   if (referredBy) {
     const referrer = db.forUser(referredBy);
-    const commission = +(intent.requestedAmount * COMMISSION_RATE).toFixed(8);
+    const commission = +(intent.requestedAmount * REFERRAL_COMMISSION_RATE).toFixed(8);
     referrer.wallet = referrer.wallet || {};
-    referrer.wallet.balance = +((referrer.wallet.balance || 0) + commission).toFixed(8);
+    referrer.wallet.creditBalance = +((referrer.wallet.creditBalance || 0) + commission).toFixed(8);
     referrer.referral = referrer.referral || {};
     referrer.referral.referralEarned = +((referrer.referral.referralEarned || 0) + commission).toFixed(8);
     commissionPaid = commission;

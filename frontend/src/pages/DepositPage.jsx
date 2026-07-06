@@ -153,12 +153,18 @@ export function DepositPage({ isMobile, wallet, walletAddress, onCredited }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
             <div style={{ fontSize: "0.66rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>
-              Current balance
+              Total balance
             </div>
             <div style={{ fontFamily: C.mono, fontSize: "2.4rem", fontWeight: 700, color: C.supra, lineHeight: 1 }}>
-              {fmt(wallet.balance)}
+              {fmt(wallet.balance + (wallet.creditBalance || 0))}
               <span style={{ fontSize: "0.9rem", color: C.muted, fontWeight: 400, marginLeft: 8 }}>SUPRA</span>
             </div>
+            {!!wallet.creditBalance && (
+              <div style={{ display: "flex", gap: 16, marginTop: 10 }}>
+                <div style={{ fontSize: "0.74rem", color: C.text2 }}>Deposited: <span style={{ fontFamily: C.mono, color: C.text }}>{fmt(wallet.balance)}</span></div>
+                <div style={{ fontSize: "0.74rem", color: C.accent2 }}>Referral credits: <span style={{ fontFamily: C.mono }}>{fmt(wallet.creditBalance)}</span></div>
+              </div>
+            )}
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "0.7rem", color: C.muted }}>Cost per post</div>

@@ -26,9 +26,19 @@ export function Sidebar({ tabs, tab, setTab, wallet, topUp, compact }) {
 
       <div style={{ fontSize: "0.62rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.15em", padding: "26px 15px 10px" }}>Wallet</div>
       <Card style={{ padding: 18 }}>
-        <div style={{ fontSize: "0.64rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Balance</div>
-        <div style={{ fontFamily: C.mono, fontSize: "1.5rem", color: C.supra, fontWeight: 600, marginTop: 6 }}>{fmt(wallet.balance)}</div>
+        <div style={{ fontSize: "0.64rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Total balance</div>
+        <div style={{ fontFamily: C.mono, fontSize: "1.5rem", color: C.supra, fontWeight: 600, marginTop: 6 }}>{fmt(wallet.balance + (wallet.creditBalance || 0))}</div>
         <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 4 }}>SUPRA tokens</div>
+        {!!wallet.creditBalance && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem" }}>
+              <span style={{ color: C.muted }}>Deposited</span><span style={{ fontFamily: C.mono, color: C.text2 }}>{fmt(wallet.balance)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", marginTop: 4 }}>
+              <span style={{ color: C.muted }}>Referral credits</span><span style={{ fontFamily: C.mono, color: C.accent2 }}>{fmt(wallet.creditBalance)}</span>
+            </div>
+          </div>
+        )}
         <Btn full variant="supra" size="sm" style={{ marginTop: 14 }} onClick={() => topUp(10)}>+ Add 10 SUPRA</Btn>
       </Card>
 

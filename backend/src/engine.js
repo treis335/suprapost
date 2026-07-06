@@ -24,14 +24,21 @@ async function runGenerationCycle(db, address, opts = {}) {
   const user = db.forUser(address);
   const { wallet, settings, channels } = user;
 
-  if (wallet.balance < wallet.costPerPost) {
+  wallet.creditBalance = wallet.creditBalance || 0;
+  const totalFunds = +(wallet.balance + wallet.creditBalance).toFixed(8);
+  if (totalFunds < wallet.costPerPost) {
     push("✕ Insufficient SUPRA balance — cycle aborted");
     return { ok: false, reason: "insufficient_balance", log };
   }
 
-  wallet.balance    = +(wallet.balance    - wallet.costPerPost).toFixed(2);
+  // Spend referral credits first, then the deposited balance
+  let remaining = wallet.costPerPost;
+  const fromCredit = Math.min(wallet.creditBalance, remaining);
+  wallet.creditBalance = +(wallet.creditBalance - fromCredit).toFixed(8);
+  remaining = +(remaining - fromCredit).toFixed(8);
+  wallet.balance = +(wallet.balance - remaining).toFixed(8);
   user.stats.supraEarned = +(user.stats.supraEarned + wallet.costPerPost).toFixed(2);
-  push(`⬡ Charged ${wallet.costPerPost} SUPRA — balance now ${wallet.balance}`);
+  push(`⬡ Charged ${wallet.costPerPost} SUPRA — balance now ${wallet.balance} (+${wallet.creditBalance} credits)`);
 
   // ── Text ──────────────────────────────────────────────────────────────────
   let text = null;

@@ -47,7 +47,8 @@ function freshUserData() {
       imageCustomPrompt: "",
     },
     wallet: {
-      balance: 0,
+      balance: 0,        // real SUPRA the user deposited themselves
+      creditBalance: 0,  // SUPRA earned from referral commissions — separate origin
       costPerPost: 1,
       deposits: [], // { id, amount, txHash, createdAt, encodedAmount }
     },
@@ -107,7 +108,9 @@ class JsonDB {
     if (!this.data.users[key]) {
       this.data.users[key] = freshUserData();
     }
-    return this.data.users[key];
+    const u = this.data.users[key];
+    if (u.wallet && u.wallet.creditBalance === undefined) u.wallet.creditBalance = 0;
+    return u;
   }
 }
 
@@ -132,6 +135,9 @@ const db = new JsonDB(file, defaultData);
             users[newKey].wallet?.balance || 0,
             users[key].wallet?.balance || 0
           );
+          users[newKey].wallet.creditBalance = +(
+            (users[newKey].wallet?.creditBalance || 0) + (users[key].wallet?.creditBalance || 0)
+          ).toFixed(8);
           users[newKey].wallet.deposits = [
             ...(users[newKey].wallet?.deposits || []),
             ...(users[key].wallet?.deposits || []),

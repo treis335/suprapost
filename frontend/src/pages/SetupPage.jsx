@@ -16,9 +16,15 @@ export function SetupPage({ isMobile, wallet, walletAddress, onCredited, setting
       <Card eyebrow="Wallet" title="SUPRA Balance" accentTop={C.supra}>
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontFamily: C.mono, fontSize: "2rem", color: C.supra, fontWeight: 700, lineHeight: 1 }}>
-            {fmt(wallet.balance)}
+            {fmt(wallet.balance + (wallet.creditBalance || 0))}
             <span style={{ fontSize: "0.8rem", opacity: 0.6, fontWeight: 400, marginLeft: 6 }}>SUPRA</span>
           </div>
+          {!!wallet.creditBalance && (
+            <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
+              <div style={{ fontSize: "0.72rem", color: C.text2 }}>Deposited: {fmt(wallet.balance)}</div>
+              <div style={{ fontSize: "0.72rem", color: C.accent2 }}>Credits: {fmt(wallet.creditBalance)}</div>
+            </div>
+          )}
           <div style={{ fontSize: "0.72rem", color: C.muted, marginTop: 6 }}>{fmt(wallet.costPerPost)} SUPRA per post</div>
         </div>
         <TopUpFlow walletAddress={walletAddress} onCredited={onCredited} />

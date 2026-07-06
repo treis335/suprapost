@@ -345,7 +345,7 @@ function LowBalanceBanner({ balance, costPerPost, onDeposit }) {
 function OnboardingChecklist({ settings, channels, wallet, onNavigate }) {
   const hasProfile = !!(settings.niche && settings.tone);
   const hasChannel = channels.some(c => c.configured && c.enabled);
-  const hasBalance = wallet.balance >= wallet.costPerPost;
+  const hasBalance = (wallet.balance + (wallet.creditBalance || 0)) >= wallet.costPerPost;
   const allDone = hasProfile && hasChannel && hasBalance;
 
   // Dismiss permanently once all steps are done
@@ -952,7 +952,7 @@ export default function App() {
       <Card id="deposit-section" eyebrow="Payments" title="SUPRA Balance" accentTop={C.supra}>
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontFamily: C.mono, fontSize: "1.7rem", color: C.supra, fontWeight: 600 }}>
-            {fmt(wallet.balance)} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span>
+            {fmt(wallet.balance + (wallet.creditBalance || 0))} <span style={{ fontSize: "0.72rem", opacity: 0.7, fontWeight: 400 }}>SUPRA</span>
           </div>
           <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 4 }}>1 SUPRA per post</div>
         </div>
@@ -1161,7 +1161,7 @@ export default function App() {
       <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans }}>
         <GlobalStyle />
         {toastEl}
-        <LowBalanceBanner balance={wallet.balance} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
+        <LowBalanceBanner balance={wallet.balance + (wallet.creditBalance || 0)} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.85)", backdropFilter: "blur(10px)", position: "sticky", top: 0, zIndex: 100 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: "1.1rem", fontFamily: C.display }}>Supra<span style={{ color: C.accent }}>Post</span></div>
@@ -1169,7 +1169,7 @@ export default function App() {
           </div>
           <div style={{ display: "flex", gap: 7 }}>
             <Pill color={C.accent2}>{shortAddress(session?.address)}</Pill>
-            <Pill color={C.supra}>⬡ {fmt(wallet.balance)}</Pill>
+            <Pill color={C.supra}>⬡ {fmt(wallet.balance + (wallet.creditBalance || 0))}</Pill>
             <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "ON" : "OFF"}</Pill>
           </div>
         </div>
@@ -1191,14 +1191,14 @@ export default function App() {
       <div style={{ background: C.bgGrad, color: C.text, minHeight: "100vh", fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
         <GlobalStyle />
         {toastEl}
-        <LowBalanceBanner balance={wallet.balance} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
+        <LowBalanceBanner balance={wallet.balance + (wallet.creditBalance || 0)} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.7)", backdropFilter: "blur(10px)" }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: "1.15rem", fontFamily: C.display }}>Supra<span style={{ color: C.accent }}>Post</span></div>
             <div style={{ fontSize: "0.62rem", color: C.muted }}>AI Social Automation</div>
           </div>
           <div style={{ display: "flex", gap: 9 }}>
-            <Pill color={C.supra}>⬡ {fmt(wallet.balance)}</Pill>
+            <Pill color={C.supra}>⬡ {fmt(wallet.balance + (wallet.creditBalance || 0))}</Pill>
             <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Active" : "Idle"}</Pill>
           </div>
         </div>
@@ -1219,14 +1219,14 @@ export default function App() {
     <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
       <GlobalStyle />
       {toastEl}
-      <LowBalanceBanner balance={wallet.balance} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
+      <LowBalanceBanner balance={wallet.balance + (wallet.creditBalance || 0)} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 32px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.6)", backdropFilter: "blur(10px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ fontWeight: 700, fontSize: "1.25rem", fontFamily: C.display, letterSpacing: "-0.01em" }}>Supra<span style={{ color: C.accent }}>Post</span></div>
           <span style={{ fontSize: "0.74rem", color: C.muted, borderLeft: `1px solid ${C.border}`, paddingLeft: 14 }}>AI Social Automation</span>
         </div>
         <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
-          <Pill color={C.supra}>⬡ {fmt(wallet.balance)} SUPRA</Pill>
+          <Pill color={C.supra}>⬡ {fmt(wallet.balance + (wallet.creditBalance || 0))} SUPRA</Pill>
           <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Automation active" : "Idle"}</Pill>
           <Pill color={C.accent2} title={session?.address}>{shortAddress(session?.address)}</Pill>
           <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
@@ -1244,12 +1244,22 @@ export default function App() {
 
           <div style={{ fontSize: "0.62rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.15em", padding: "24px 14px 9px" }}>Wallet</div>
           <Card style={{ padding: 16 }}>
-            <div style={{ fontSize: "0.64rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Balance</div>
-            <div style={{ fontFamily: C.mono, fontSize: "1.5rem", color: C.supra, fontWeight: 600, marginTop: 5 }}>{fmt(wallet.balance)}</div>
+            <div style={{ fontSize: "0.64rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Total balance</div>
+            <div style={{ fontFamily: C.mono, fontSize: "1.5rem", color: C.supra, fontWeight: 600, marginTop: 5 }}>{fmt(wallet.balance + (wallet.creditBalance || 0))}</div>
             <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 3 }}>SUPRA tokens</div>
-            {wallet.balance <= wallet.costPerPost * 3 && (
-              <div style={{ fontSize: "0.66rem", color: wallet.balance < wallet.costPerPost ? C.danger : C.warn, marginTop: 4 }}>
-                {wallet.balance < wallet.costPerPost ? "⚠ Low — add funds" : "⚠ Running low"}
+            {!!wallet.creditBalance && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                <span style={{ color: C.muted }}>Deposited</span><span style={{ fontFamily: C.mono, color: C.text2 }}>{fmt(wallet.balance)}</span>
+              </div>
+            )}
+            {!!wallet.creditBalance && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", marginTop: 4 }}>
+                <span style={{ color: C.muted }}>Referral credits</span><span style={{ fontFamily: C.mono, color: C.accent2 }}>{fmt(wallet.creditBalance)}</span>
+              </div>
+            )}
+            {(wallet.balance + (wallet.creditBalance || 0)) <= wallet.costPerPost * 3 && (
+              <div style={{ fontSize: "0.66rem", color: (wallet.balance + (wallet.creditBalance || 0)) < wallet.costPerPost ? C.danger : C.warn, marginTop: 8 }}>
+                {(wallet.balance + (wallet.creditBalance || 0)) < wallet.costPerPost ? "⚠ Low — add funds" : "⚠ Running low"}
               </div>
             )}
             <Btn full variant="supra" size="sm" style={{ marginTop: 12 }} onClick={() => {
