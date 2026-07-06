@@ -152,6 +152,28 @@ const db = new JsonDB(file, defaultData);
       await db.write();
       console.log(`[db] Migrated ${migrated} user key(s) to normalised format (no 0x prefix).`);
     }
+
+    // One-time reconciliation: commissions earned before creditBalance existed
+    // were credited straight into `balance`. Backfill creditBalance from the
+    // lifetime referralEarned counter (capped at current balance) so old
+    // earnings show up as credits instead of deposits.
+    let reconciled = 0;
+    for (const u of Object.values(db.data.users || {})) {
+      const earned = u.referral?.referralEarned || 0;
+      const currentCredit = u.wallet?.creditBalance || 0;
+      if (earned > currentCredit && u.wallet) {
+        const backfill = Math.min(earned - currentCredit, u.wallet.balance || 0);
+        if (backfill > 0) {
+          u.wallet.creditBalance = +(currentCredit + backfill).toFixed(8);
+          u.wallet.balance = +((u.wallet.balance || 0) - backfill).toFixed(8);
+          reconciled++;
+        }
+      }
+    }
+    if (reconciled > 0) {
+      await db.write();
+      console.log(`[db] Reconciled creditBalance from referralEarned for ${reconciled} user(s).`);
+    }
   } catch (e) {
     console.error("[db] Migration error:", e.message);
   }
