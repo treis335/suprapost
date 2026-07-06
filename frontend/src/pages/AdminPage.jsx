@@ -35,13 +35,13 @@ export function AdminPage({ walletAddress }) {
     setError(null);
     setPayingId(w.id);
     try {
-      const result = await sendSupraTransfer(walletAddress, w.toAddress, w.amount);
-      if (!result?.hash) throw new Error("No transaction hash returned by StarKey.");
+      const txHash = await sendSupraTransfer(walletAddress, w.toAddress, w.amount);
+      if (!txHash || typeof txHash !== "string") throw new Error("No transaction hash returned by StarKey.");
 
       const res = await fetch(`/api/admin/withdrawals/${w.address}/${w.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ status: "paid", txHash: result.hash }),
+        body: JSON.stringify({ status: "paid", txHash }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Failed to mark as paid.");
