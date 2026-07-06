@@ -10,7 +10,7 @@ const { startAutomation, stopAutomation, resumeAllAutomations } = require("./sch
 const { publishToChannels } = require("./channels");
 const { createNonce, verifyAndIssueToken, requireAuth, getPendingRef } = require("./auth");
 const { createDepositIntent, getIntentStatus, pollForDeposits, confirmDepositByTxHash } = require("./deposits");
-const { requestWithdrawal, listAllPending, markWithdrawal } = require("./withdrawals");
+const { requestWithdrawal, listAllPending, listAllHistory, markWithdrawal } = require("./withdrawals");
 const { cleanOldImages, IMAGES_DIR } = require("./imageGen");
 
 const PORT = process.env.PORT || 3001;
@@ -246,6 +246,11 @@ async function main() {
   app.get("/api/admin/withdrawals", requireAuth, requireAdmin, async (req, res) => {
     await db.read();
     res.json({ ok: true, withdrawals: listAllPending(db) });
+  });
+
+  app.get("/api/admin/withdrawals/history", requireAuth, requireAdmin, async (req, res) => {
+    await db.read();
+    res.json({ ok: true, withdrawals: listAllHistory(db) });
   });
 
   app.post("/api/admin/withdrawals/:address/:id", requireAuth, requireAdmin, async (req, res) => {

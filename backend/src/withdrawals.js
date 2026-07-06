@@ -68,6 +68,16 @@ function listAllPending(db) {
   return out.sort((a, b) => a.createdAt - b.createdAt);
 }
 
+function listAllHistory(db) {
+  const out = [];
+  for (const [address, user] of Object.entries(db.data.users || {})) {
+    for (const w of user.wallet?.withdrawals || []) {
+      if (w.status !== "pending") out.push({ ...w, address });
+    }
+  }
+  return out.sort((a, b) => (b.resolvedAt || 0) - (a.resolvedAt || 0));
+}
+
 async function markWithdrawal(db, address, withdrawalId, status, txHash) {
   await db.read();
   const user = db.forUser(address);
@@ -85,4 +95,4 @@ async function markWithdrawal(db, address, withdrawalId, status, txHash) {
   return { ok: true, withdrawal: w };
 }
 
-module.exports = { requestWithdrawal, listAllPending, markWithdrawal, MIN_WITHDRAWAL };
+module.exports = { requestWithdrawal, listAllPending, listAllHistory, markWithdrawal, MIN_WITHDRAWAL };

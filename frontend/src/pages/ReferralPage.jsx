@@ -168,9 +168,11 @@ export function ReferralPage({ walletAddress, isMobile }) {
         {withdrawals.length > 0 && (
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
             {withdrawals.map(w => (
-              <div key={w.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem", padding: "6px 0" }}>
+              <div key={w.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.78rem", padding: "6px 0", gap: 10 }}>
                 <span style={{ fontFamily: C.mono, color: C.text2 }}>{fmt(w.amount)} SUPRA</span>
-                <span style={{ color: w.status === "paid" ? C.supra : w.status === "rejected" ? C.danger : C.warn, textTransform: "capitalize" }}>{w.status}</span>
+                {w.txHash
+                  ? <a href={`https://suprascan.io/tx/${w.txHash}`} target="_blank" rel="noreferrer" style={{ fontFamily: C.mono, fontSize: "0.7rem", color: C.accent2, textDecoration: "none" }}>{w.txHash.slice(0, 8)}…↗</a>
+                  : <span style={{ color: w.status === "rejected" ? C.danger : C.warn, textTransform: "capitalize" }}>{w.status}</span>}
               </div>
             ))}
           </div>

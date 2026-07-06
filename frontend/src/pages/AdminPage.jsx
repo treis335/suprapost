@@ -16,17 +16,20 @@ function authHeaders() {
 
 export function AdminPage({ walletAddress }) {
   const [items, setItems] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState(null);
   const [error, setError] = useState(null);
 
   function load() {
     setLoading(true);
-    fetch("/api/admin/withdrawals", { headers: authHeaders() })
-      .then(r => r.json())
-      .then(d => { if (d.ok) setItems(d.withdrawals); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch("/api/admin/withdrawals", { headers: authHeaders() }).then(r => r.json()),
+      fetch("/api/admin/withdrawals/history", { headers: authHeaders() }).then(r => r.json()),
+    ]).then(([pending, hist]) => {
+      if (pending.ok) setItems(pending.withdrawals);
+      if (hist.ok) setHistory(hist.withdrawals);
+    }).catch(() => {}).finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, []);
@@ -97,6 +100,30 @@ export function AdminPage({ walletAddress }) {
           </div>
         </Card>
       ))}
+
+      {history.length > 0 && (
+        <div>
+          <div style={{ fontSize: "0.72rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", margin: "10px 0 12px" }}>Payment history</div>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
+            {history.map(w => (
+              <div key={w.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: `1px solid ${C.border}` }}>
+                <div>
+                  <div style={{ fontFamily: C.mono, fontSize: "0.9rem", color: C.text }}>{fmt(w.amount)} SUPRA</div>
+                  <div style={{ fontSize: "0.7rem", color: C.muted, wordBreak: "break-all" }}>to 0x{w.toAddress}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "0.76rem", color: w.status === "paid" ? C.supra : C.danger, textTransform: "capitalize" }}>{w.status}</div>
+                  {w.txHash && (
+                    <a href={`https://suprascan.io/tx/${w.txHash}`} target="_blank" rel="noreferrer" style={{ fontFamily: C.mono, fontSize: "0.68rem", color: C.accent2, textDecoration: "none" }}>
+                      {w.txHash.slice(0, 10)}…↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
