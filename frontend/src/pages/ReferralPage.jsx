@@ -14,10 +14,20 @@ function authHeaders() {
 export function ReferralPage({ walletAddress, isMobile }) {
   const [stats, setStats]   = useState(null);
   const [copied, setCopied] = useState(false);
+  const [creditBalance, setCreditBalance] = useState(0);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [amount, setAmount] = useState("");
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [msg, setMsg] = useState(null);
 
   const refLink = walletAddress
     ? `${window.location.origin}/?ref=0x${walletAddress.replace(/^0x/, "")}`
     : "";
+
+  function loadWallet() {
+    fetch("/api/wallet", { headers: authHeaders() }).then(r => r.json()).then(w => setCreditBalance(w.creditBalance || 0)).catch(() => {});
+    fetch("/api/wallet/withdrawals", { headers: authHeaders() }).then(r => r.json()).then(d => { if (d.ok) setWithdrawals(d.withdrawals); }).catch(() => {});
+  }
 
   useEffect(() => {
     if (!walletAddress) return;
@@ -25,7 +35,26 @@ export function ReferralPage({ walletAddress, isMobile }) {
       .then(r => r.json())
       .then(d => { if (d.ok) setStats(d); })
       .catch(() => {});
+    loadWallet();
   }, [walletAddress]);
+
+  async function submitWithdraw() {
+    setMsg(null);
+    setWithdrawing(true);
+    try {
+      const res = await fetch("/api/wallet/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ amount: Number(amount) }),
+      });
+      const data = await res.json();
+      if (!data.ok) { setMsg({ ok: false, text: data.error || "Withdrawal failed." }); }
+      else { setMsg({ ok: true, text: "Withdrawal requested — you'll receive it shortly." }); setAmount(""); loadWallet(); }
+    } catch {
+      setMsg({ ok: false, text: "Network error — try again." });
+    }
+    setWithdrawing(false);
+  }
 
   function copyLink() {
     navigator.clipboard.writeText(refLink).then(() => {
@@ -109,6 +138,43 @@ export function ReferralPage({ walletAddress, isMobile }) {
         }}>
           {copied ? "✓  Link copied!" : "📋  Copy referral link"}
         </button>
+      </div>
+
+      {/* Withdraw credits */}
+      <div style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 16, padding: "20px 22px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+          <div style={{ fontSize: "0.74rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Withdraw credits</div>
+          <div style={{ fontFamily: C.mono, fontSize: "0.85rem", color: C.accent2 }}>{fmt(creditBalance)} available</div>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <input
+            value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount"
+            type="number" min="1" step="0.01"
+            style={{ flex: 1, minWidth: 140, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 11, color: C.text, fontFamily: C.mono, fontSize: "0.88rem", padding: "12px 14px", outline: "none" }}
+          />
+          <button onClick={submitWithdraw} disabled={withdrawing || !amount || Number(amount) > creditBalance}
+            style={{
+              padding: "12px 20px", borderRadius: 11, border: "none", fontWeight: 700, fontSize: "0.86rem",
+              cursor: (withdrawing || !amount) ? "not-allowed" : "pointer",
+              opacity: (withdrawing || !amount || Number(amount) > creditBalance) ? 0.5 : 1,
+              background: `linear-gradient(135deg, ${C.accent}, ${C.accentDeep})`, color: "#fff",
+            }}>
+            {withdrawing ? "Requesting…" : "Withdraw"}
+          </button>
+        </div>
+        {msg && <div style={{ marginTop: 10, fontSize: "0.78rem", color: msg.ok ? C.supra : C.danger }}>{msg.text}</div>}
+        <div style={{ marginTop: 10, fontSize: "0.72rem", color: C.muted }}>Only referral credits can be withdrawn — sent to your own wallet address, reviewed and paid out by the platform.</div>
+
+        {withdrawals.length > 0 && (
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+            {withdrawals.map(w => (
+              <div key={w.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem", padding: "6px 0" }}>
+                <span style={{ fontFamily: C.mono, color: C.text2 }}>{fmt(w.amount)} SUPRA</span>
+                <span style={{ color: w.status === "paid" ? C.supra : w.status === "rejected" ? C.danger : C.warn, textTransform: "capitalize" }}>{w.status}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* How it works */}

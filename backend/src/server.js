@@ -10,6 +10,7 @@ const { startAutomation, stopAutomation, resumeAllAutomations } = require("./sch
 const { publishToChannels } = require("./channels");
 const { createNonce, verifyAndIssueToken, requireAuth, getPendingRef } = require("./auth");
 const { createDepositIntent, getIntentStatus, pollForDeposits, confirmDepositByTxHash } = require("./deposits");
+const { requestWithdrawal } = require("./withdrawals");
 const { cleanOldImages, IMAGES_DIR } = require("./imageGen");
 
 const PORT = process.env.PORT || 3001;
@@ -209,6 +210,21 @@ async function main() {
     const user = db.forUser(req.walletAddress);
     const deposits = Array.isArray(user.wallet.deposits) ? user.wallet.deposits : [];
     res.json({ ok: true, deposits });
+  });
+
+  // POST /api/wallet/withdraw — cash out referral credits only (never deposited balance)
+  app.post("/api/wallet/withdraw", requireAuth, async (req, res) => {
+    const { amount, toAddress } = req.body;
+    const result = await requestWithdrawal(db, req.walletAddress, amount, toAddress);
+    if (!result.ok) return res.status(400).json(result);
+    res.json(result);
+  });
+
+  // GET /api/wallet/withdrawals — withdrawal request history
+  app.get("/api/wallet/withdrawals", requireAuth, async (req, res) => {
+    await db.read();
+    const user = db.forUser(req.walletAddress);
+    res.json({ ok: true, withdrawals: user.wallet.withdrawals || [] });
   });
 
   // ── Real, non-custodial deposits ──

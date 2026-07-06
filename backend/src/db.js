@@ -51,6 +51,7 @@ function freshUserData() {
       creditBalance: 0,  // SUPRA earned from referral commissions — separate origin
       costPerPost: 1,
       deposits: [], // { id, amount, txHash, createdAt, encodedAmount }
+      withdrawals: [], // { id, amount, toAddress, status, createdAt, txHash? }
     },
     stats: {
       totalGenerations: 0,
