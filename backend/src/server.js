@@ -8,7 +8,7 @@ const { initDB } = require("./db");
 const { runGenerationCycle } = require("./engine");
 const { startAutomation, stopAutomation, resumeAllAutomations } = require("./scheduler");
 const { publishToChannels } = require("./channels");
-const { createNonce, verifyAndIssueToken, requireAuth } = require("./auth");
+const { createNonce, verifyAndIssueToken, requireAuth, getPendingRef } = require("./auth");
 const { createDepositIntent, getIntentStatus, pollForDeposits, confirmDepositByTxHash } = require("./deposits");
 const { cleanOldImages, IMAGES_DIR } = require("./imageGen");
 
@@ -84,9 +84,9 @@ async function main() {
   // every other request.
   // ════════════════════════════════════════════════════════
   app.post("/api/auth/nonce", (req, res) => {
-    const { address } = req.body;
+    const { address, ref } = req.body;
     if (!address) return res.status(400).json({ ok: false, error: "Missing wallet address" });
-    const message = createNonce(address);
+    const message = createNonce(address, ref); // pass referrer to store temporarily
     res.json({ ok: true, message });
   });
 
@@ -95,11 +95,48 @@ async function main() {
     if (!address || !signature) return res.status(400).json({ ok: false, error: "Missing address or signature" });
     const result = await verifyAndIssueToken(address, signature, publicKey);
     if (!result.ok) return res.status(401).json(result);
+
+    // Register referral on first ever login
+    await db.read();
+    const normalised = address.toLowerCase().replace(/^0x/, "");
+    const user = db.forUser(normalised);
+    const pendingRef = getPendingRef(normalised);
+
+    if (pendingRef && !user.referral?.referredBy) {
+      const refNorm = pendingRef.toLowerCase().replace(/^0x/, "");
+      if (refNorm !== normalised) { // can't refer yourself
+        user.referral = user.referral || {};
+        user.referral.referredBy = refNorm;
+        // Add to referrer's list
+        const referrer = db.forUser(refNorm);
+        referrer.referral = referrer.referral || {};
+        referrer.referral.referrals = referrer.referral.referrals || [];
+        if (!referrer.referral.referrals.includes(normalised)) {
+          referrer.referral.referrals.push(normalised);
+        }
+        await db.write();
+        console.log(`[referral] ${normalised} referred by ${refNorm}`);
+      }
+    }
+
     res.json(result);
   });
 
   app.get("/api/auth/me", requireAuth, (req, res) => {
     res.json({ ok: true, address: req.walletAddress });
+  });
+
+  // ── REFERRAL ─────────────────────────────────────────────────────────────
+  app.get("/api/referral", requireAuth, async (req, res) => {
+    await db.read();
+    const user = db.forUser(req.walletAddress);
+    const referral = user.referral || {};
+    res.json({
+      ok: true,
+      referredBy: referral.referredBy || null,
+      referralEarned: referral.referralEarned || 0,
+      referralCount: (referral.referrals || []).length,
+    });
   });
 
   // ── Everything below this line requires a valid wallet session.

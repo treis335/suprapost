@@ -13,8 +13,17 @@ const JWT_SECRET  = process.env.JWT_SECRET || "dev-only-insecure-secret-change-m
 const JWT_EXPIRY  = "7d";
 const NONCE_TTL_MS = 5 * 60 * 1000; // 5 min
 
-// nonce store: normalised address → { nonce, message, expiresAt }
+// nonce store: normalised address → { nonce, message, expiresAt, ref }
 const pendingNonces = new Map();
+// pending referrals: normalised address → referrer address (cleared after first login)
+const pendingRefs = new Map();
+
+function getPendingRef(address) {
+  const key = normaliseAddress(address);
+  const ref = pendingRefs.get(key) || null;
+  pendingRefs.delete(key); // single-use
+  return ref;
+}
 
 /** Normalise any address format to lowercase hex without 0x */
 function normaliseAddress(address) {
@@ -23,11 +32,13 @@ function normaliseAddress(address) {
   return (s.startsWith("0x") ? s.slice(2) : s).toLowerCase();
 }
 
-function createNonce(address) {
+function createNonce(address, ref) {
   const key     = normaliseAddress(address);
   const nonce   = uuidv4();
   const message = `Sign in to SupraPost\n\nWallet: ${address}\nNonce: ${nonce}\nThis request will not trigger a blockchain transaction or cost any gas.`;
   pendingNonces.set(key, { nonce, message, expiresAt: Date.now() + NONCE_TTL_MS });
+  // Store referrer temporarily — consumed on first successful login
+  if (ref) pendingRefs.set(key, normaliseAddress(ref));
   return message;
 }
 
@@ -90,4 +101,4 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { createNonce, verifyAndIssueToken, requireAuth };
+module.exports = { createNonce, verifyAndIssueToken, requireAuth, getPendingRef };

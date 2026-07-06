@@ -64,10 +64,13 @@ export async function signInWithWallet() {
   // Step 2: get challenge from backend — use the SAME address we just got
   let message;
   try {
+    // Check for referral code in URL (?ref=0x...)
+    const urlRef = new URLSearchParams(window.location.search).get("ref") || null;
+
     const nonceRes = await fetch("/api/auth/nonce", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address }),
+      body: JSON.stringify({ address, ref: urlRef }),
     });
     if (!nonceRes.ok) throw new Error(`Server error ${nonceRes.status}`);
     const data = await nonceRes.json();

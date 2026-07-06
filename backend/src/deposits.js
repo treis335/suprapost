@@ -162,13 +162,30 @@ async function confirmDepositByTxHash(db, intent, txHash) {
   });
   // Keep only the last 50 deposits
   if (user.wallet.deposits.length > 50) user.wallet.deposits = user.wallet.deposits.slice(0, 50);
+
+  // ── Referral commission: 10% credited to referrer ─────────────────────
+  const COMMISSION_RATE = 0.10;
+  const referredBy = user.referral?.referredBy;
+  let commissionPaid = 0;
+
+  if (referredBy) {
+    const referrer = db.forUser(referredBy);
+    const commission = +(intent.requestedAmount * COMMISSION_RATE).toFixed(8);
+    referrer.wallet = referrer.wallet || {};
+    referrer.wallet.balance = +((referrer.wallet.balance || 0) + commission).toFixed(8);
+    referrer.referral = referrer.referral || {};
+    referrer.referral.referralEarned = +((referrer.referral.referralEarned || 0) + commission).toFixed(8);
+    commissionPaid = commission;
+    console.log(`[referral] ${commission} SUPRA commission → ${referredBy} (from deposit by ${intent.userAddress})`);
+  }
+
   await db.write();
 
   intent.fulfilled = true;
   intent.txHash = txHash;
 
-  console.log(`[deposits] Creditado ${intent.requestedAmount} SUPRA a ${intent.userAddress} via hash ${txHash}`);
-  return { ok: true, credited: intent.requestedAmount };
+  console.log(`[deposits] Credited ${intent.requestedAmount} SUPRA to ${intent.userAddress} via hash ${txHash}`);
+  return { ok: true, credited: intent.requestedAmount, commissionPaid };
 }
 
 module.exports = {

@@ -632,6 +632,97 @@ function LoginScreen({ onSignedIn, isMobile }) {
 }
 
 
+/* ── ReferralCard ────────────────────────────────────────────────────────── */
+function ReferralCard({ walletAddress }) {
+  const [stats, setStats] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!walletAddress) return;
+    fetch("/api/referral", { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setStats(d); })
+      .catch(() => {});
+  }, [walletAddress]);
+
+  const refLink = walletAddress
+    ? `${window.location.origin}/?ref=0x${walletAddress.replace(/^0x/, "")}`
+    : "";
+
+  function copyLink() {
+    navigator.clipboard.writeText(refLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <Card eyebrow="Referrals" title="Earn SUPRA" accentTop={C.accent}>
+      <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6, marginBottom: 14 }}>
+        Share your link. Every time someone you referred deposits SUPRA, you automatically earn <strong style={{ color: C.supra }}>10% commission</strong> — forever.
+      </div>
+
+      {/* Referral link */}
+      <div style={{
+        background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10,
+        padding: "10px 14px", display: "flex", alignItems: "center",
+        gap: 10, marginBottom: 14,
+      }}>
+        <span style={{
+          flex: 1, fontFamily: C.mono, fontSize: "0.72rem", color: C.muted,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>{refLink || "Sign in to get your link"}</span>
+        <button onClick={copyLink} disabled={!refLink} style={{
+          all: "unset", cursor: refLink ? "pointer" : "not-allowed",
+          padding: "5px 14px", borderRadius: 7, flexShrink: 0,
+          fontSize: "0.76rem", fontWeight: 700,
+          background: copied ? `${C.supra}20` : `${C.accent}18`,
+          color: copied ? C.supra : C.accent,
+          border: `1px solid ${copied ? C.supra + "44" : C.accent + "44"}`,
+          transition: "all 0.2s",
+        }}>
+          {copied ? "✓ Copied!" : "Copy link"}
+        </button>
+      </div>
+
+      {/* Stats */}
+      {stats && (
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{
+            flex: 1, background: C.raised, border: `1px solid ${C.border}`,
+            borderRadius: 9, padding: "10px 12px", textAlign: "center",
+          }}>
+            <div style={{ fontFamily: C.mono, fontSize: "1.2rem", fontWeight: 700, color: C.text }}>
+              {stats.referralCount}
+            </div>
+            <div style={{ fontSize: "0.68rem", color: C.muted, marginTop: 2 }}>Users referred</div>
+          </div>
+          <div style={{
+            flex: 1, background: C.raised, border: `1px solid ${C.border}`,
+            borderRadius: 9, padding: "10px 12px", textAlign: "center",
+          }}>
+            <div style={{ fontFamily: C.mono, fontSize: "1.2rem", fontWeight: 700, color: C.supra }}>
+              {fmt(stats.referralEarned)}
+            </div>
+            <div style={{ fontSize: "0.68rem", color: C.muted, marginTop: 2 }}>SUPRA earned</div>
+          </div>
+          {stats.referredBy && (
+            <div style={{
+              flex: 1, background: C.raised, border: `1px solid ${C.border}`,
+              borderRadius: 9, padding: "10px 12px", textAlign: "center",
+            }}>
+              <div style={{ fontFamily: C.mono, fontSize: "0.7rem", fontWeight: 600, color: C.accent2, wordBreak: "break-all" }}>
+                {stats.referredBy.slice(0, 8)}...
+              </div>
+              <div style={{ fontSize: "0.68rem", color: C.muted, marginTop: 2 }}>Your referrer</div>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /* ── TopUpFlow ───────────────────────────────────────────────────────────── */
 function TopUpFlow({ walletAddress, onCredited }) {
   const [amount, setAmount] = useState(10);
@@ -869,6 +960,8 @@ export default function App() {
           Your balance is held on the platform and debited for each post.
         </div>
       </Card>
+
+      <ReferralCard walletAddress={session?.address} />
 
       <Card eyebrow="Voice & Content" title="Content Profile">
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "0 18px" }}>

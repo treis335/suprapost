@@ -56,6 +56,11 @@ function freshUserData() {
       totalPosts: 0,
       supraEarned: 0,
     },
+    referral: {
+      referredBy: null,      // wallet address of whoever referred this user (permanent, immutable)
+      referralEarned: 0,     // total SUPRA earned from referrals
+      referrals: [],         // list of wallets this user has referred
+    },
     posts: [], // { id, text, scores, time, auto, results: { telegram: {...}, twitter: {...} } }
   };
 }
