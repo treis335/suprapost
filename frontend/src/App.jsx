@@ -8,6 +8,9 @@ import { ChannelsPanel } from "./pages/ChannelsPage";
 import { LandingPage } from "./pages/LandingPage";
 import { depositSupra } from "./payment";
 
+// === CONFIGURAÇÃO API (FIX PARA VERCEL + TUNNEL) ===
+const apiBase = __API_URL__ || "";
+
 const TABS = [
   { id: "setup",      icon: "⚙",  label: "Setup" },
   { id: "channels",   icon: "📡", label: "Channels" },
@@ -34,14 +37,15 @@ function authHeaders() {
   return session?.token ? { Authorization: `Bearer ${session.token}` } : {};
 }
 
+// API com suporte a backend separado
 const api = {
   async get(path) {
-    const res = await fetch(`/api${path}`, { headers: { ...authHeaders() } });
+    const res = await fetch(`${apiBase}/api${path}`, { headers: { ...authHeaders() } });
     if (res.status === 401) return { unauthorized: true };
     return res.json();
   },
   async post(path, body) {
-    const res = await fetch(`/api${path}`, {
+    const res = await fetch(`${apiBase}/api${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(body || {}),
@@ -50,7 +54,7 @@ const api = {
     return res.json();
   },
   async del(path) {
-    const res = await fetch(`/api${path}`, { method: "DELETE", headers: { ...authHeaders() } });
+    const res = await fetch(`${apiBase}/api${path}`, { method: "DELETE", headers: { ...authHeaders() } });
     if (res.status === 401) return { unauthorized: true };
     return res.json();
   },
@@ -86,7 +90,7 @@ const GlobalStyle = () => (
   `}</style>
 );
 
-/* ── Toast ───────────────────────────────────────────────────────────────── */
+/* Resto do ficheiro igual ao teu original */
 function Toast({ message, onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, []);
   return (
