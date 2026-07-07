@@ -16,6 +16,9 @@
  *   { from, to, value (em octas como string) }
  */
 
+// === CONFIGURAÇÃO API (FIX PARA VERCEL + TUNNEL) ===
+const apiBase = __API_URL__ || "";
+
 const OCTAS_PER_SUPRA = 1e8;
 
 function getProvider() {
@@ -33,7 +36,7 @@ function getAuthHeaders() {
 }
 
 async function apiCreateIntent(amountSupra) {
-  const res = await fetch("/api/wallet/deposit/intent", {
+  const res = await fetch(`${apiBase}/api/wallet/deposit/intent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({ amount: amountSupra }),
@@ -42,7 +45,7 @@ async function apiCreateIntent(amountSupra) {
 }
 
 async function apiConfirmDeposit(intentId, txHash) {
-  const res = await fetch("/api/wallet/deposit/confirm", {
+  const res = await fetch(`${apiBase}/api/wallet/deposit/confirm`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({ intentId, txHash }),
@@ -72,7 +75,6 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
   });
 
   // ── Format 1: transferCoin (high-level API — more reliable) ──────────────
-  // Some StarKey versions have this native transfer method
   if (typeof provider.transferCoin === "function") {
     try {
       console.log("[payment] Tentando provider.transferCoin()...");
@@ -92,7 +94,6 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
   }
 
   // ── Formato 2: sendTransaction com objeto simples ──────────────────────────
-  // Works on most recent StarKey versions
   if (typeof provider.sendTransaction === "function") {
     // Formato 2a: from/to/value
     try {
@@ -116,7 +117,6 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
       try {
         console.log("[payment] Tentando createRawTransactionData + sendTransaction...");
 
-        // BCS helpers
         function bcsU64(value) {
           const big = BigInt(value);
           const buf = new Uint8Array(8);
@@ -137,10 +137,9 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
 
         const txExpiryTime = BigInt(Math.ceil(Date.now() / 1000) + 120);
 
-        // Formato confirmado do SupraScan — function_id sem 0x no meio
         const rawPayload = [
-          sender,                   // sender address
-          0,                        // sequence number (StarKey preenche)
+          sender,
+          0,
           "0000000000000000000000000000000000000000000000000000000000000001",
           "supra_account",
           "transfer_coins",
@@ -162,7 +161,7 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
       }
     }
 
-    // Format 2c: Move payload in readable JSON format (some versions accept this)
+    // Format 2c: Move payload in readable JSON format
     try {
       console.log("[payment] Tentando sendTransaction com payload Move JSON...");
       const result = await provider.sendTransaction({
@@ -231,16 +230,14 @@ export async function depositSupra(walletAddress, amountSupra, onStatus = () => 
       };
     }
 
-    // 3. Confirmr no backend
+    // 3. Confirm no backend
     onStatus({ step: "confirming", message: "Verifying transaction on chain..." });
     const confirmRes = await apiConfirmDeposit(intent.id, txHash);
     if (!confirmRes.ok) {
-      // Tx sent but the backend didn't confirm — show the hash for reference
       return {
         ok: false,
         error: confirmRes.error || "Backend could not confirm",
         txHash,
-        // If it was an amount-verification error, the backend may just need more time
         retryable: true,
       };
     }
