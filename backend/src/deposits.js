@@ -114,7 +114,7 @@ async function pollForDeposits(db) {
       txHash:        tx.hash,
       createdAt:     Date.now(),
     });
-    if (user.wallet.deposits.length > 50) user.wallet.deposits = user.wallet.deposits.slice(0, 50);
+    if (user.wallet.deposits.length > 20) user.wallet.deposits = user.wallet.deposits.slice(0, 20);
     intent.fulfilled = true;
     intent.txHash = tx.hash;
     fulfilled.push(intent);
@@ -193,7 +193,7 @@ async function doConfirm(db, intent, txHash) {
     createdAt:     Date.now(),
   });
   // Keep only the last 50 deposits
-  if (user.wallet.deposits.length > 50) user.wallet.deposits = user.wallet.deposits.slice(0, 50);
+  if (user.wallet.deposits.length > 20) user.wallet.deposits = user.wallet.deposits.slice(0, 20);
 
   // ── Referral commission: 10% credited to referrer's credit balance ────
   const referredBy = user.referral?.referredBy;

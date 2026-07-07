@@ -113,7 +113,7 @@ async function runGenerationCycle(db, address, opts = {}) {
   }
 
   user.posts.unshift(post);
-  if (user.posts.length > 200) user.posts = user.posts.slice(0, 200); // keep last 200 only
+  if (user.posts.length > 30) user.posts = user.posts.slice(0, 30); // keep last 30 only
   await db.write();
   return { ok: true, post, log };
 }
