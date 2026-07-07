@@ -1,5 +1,9 @@
 import { getSession, clearSession } from "../wallet";
 
+const BASE = import.meta.env.VITE_API_URL || "";
+
+import { getSession, clearSession } from "../wallet";
+
 // In production with Vercel + Cloudflare tunnel, __API_URL__ is set at build time.
 // In local dev it's empty and calls go to /api (proxied to localhost:3001).
 const BASE = typeof __API_URL__ !== "undefined" && __API_URL__ ? __API_URL__ : "";

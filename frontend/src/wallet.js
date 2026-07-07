@@ -67,7 +67,8 @@ export async function signInWithWallet() {
     // Check for referral code in URL (?ref=0x...)
     const urlRef = new URLSearchParams(window.location.search).get("ref") || null;
 
-    const nonceRes = await fetch("/api/auth/nonce", {
+    const BASE = import.meta.env.VITE_API_URL || "";
+    const nonceRes = await fetch(`${BASE}/api/auth/nonce`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address, ref: urlRef }),
@@ -99,7 +100,7 @@ export async function signInWithWallet() {
   // Step 4: verify — use SAME address from step 1
   let result;
   try {
-    const verifyRes = await fetch("/api/auth/verify", {
+    const verifyRes = await fetch(`${BASE}/api/auth/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address, signature, publicKey }),
