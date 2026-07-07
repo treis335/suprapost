@@ -62,7 +62,7 @@ const STEPS = [
   { n: "01", title: "Connect your wallet", body: "Sign in with StarKey — your Supra address is your account. No email, no password, nothing else to remember." },
   { n: "02", title: "Set your profile & channels", body: "Tell it your niche, tone and audience. Connect Telegram, Twitter/X, Discord or Instagram — only the ones you actually use." },
   { n: "03", title: "Let it run", body: "AI writes, scores, and posts on its own schedule — from every 30 seconds to once a day. Close the browser; it keeps going." },
-  { n: "04", title: "Top up with SUPRA", body: "That's the only thing you ever pay for. No API keys to manage, no subscriptions to juggle." },
+  { n: "04", title: "Top up with SUPRA", body: "That's the only thing you ever pay for. No API keys to manage, no subscriptions to juggle — and you can earn some of it back by referring others." },
 ];
 
 const FEATURES = [
@@ -70,13 +70,15 @@ const FEATURES = [
   { icon: "📡", color: C.accent2, title: "Every major channel", body: "Telegram, Twitter/X, Discord, Instagram — toggle each on, test the connection, done." },
   { icon: "⚡", color: C.warn, title: "True 24/7 automation", body: "Runs on the server, not your browser. Restarts recover exactly where they left off." },
   { icon: "⬡", color: C.supra, title: "Pay only in SUPRA", body: "Non-custodial deposits straight from your wallet. No hidden fees, no card on file." },
+  { icon: "⬢", color: C.accent, title: "Referral commissions", body: "Share your link, earn 10% of every deposit your referrals make — forever, paid by the platform." },
+  { icon: "◈", color: C.accent2, title: "One engine, one login", body: "Writing, images, scheduling, publishing, payments — nothing else to install or connect." },
 ];
 
 const STATS = [
-  { value: "4", label: "platforms, one engine" },
-  { value: "30s", label: "fastest posting cycle" },
+  { value: "1", label: "engine for everything" },
+  { value: "4", label: "platforms, one login" },
   { value: "24/7", label: "runs without you" },
-  { value: "0", label: "API keys required to start" },
+  { value: "0", label: "other tools required" },
 ];
 
 const PLATFORMS = [
@@ -339,17 +341,17 @@ export function LandingPage({ onEnter }) {
                 border: `1px solid ${C.accent2}33`, borderRadius: 999, background: `${C.accent2}0d`,
               }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.accent2, boxShadow: `0 0 8px ${C.accent2}` }} />
-                AI social automation · paid in SUPRA
+                The Content Engine · one login, everything included
               </div>
               <h1 style={{ fontFamily: C.display, fontSize: "clamp(2.4rem, 5.6vw, 3.8rem)", lineHeight: 1.04, letterSpacing: "-0.025em", margin: 0, fontWeight: 600 }}>
-                Your social presence,<br />running <span style={{
+                Not another posting tool.<br />Your entire <span style={{
                   background: `linear-gradient(90deg, ${C.accent}, ${C.accent2})`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
-                }}>while you don't.</span>
+                }}>content engine.</span>
               </h1>
               <p style={{ fontSize: "1.1rem", color: C.text2, lineHeight: 1.65, marginTop: 24, maxWidth: 500 }}>
-                SupraPost writes, checks, and publishes your posts across every
-                channel that matters — on its own schedule, on its own server.
-                You just top up the balance and watch it work.
+                Writing, images, scheduling, publishing, payments, even
+                referral payouts — SupraPost runs the whole content operation
+                from one place, on its own server, paid for in SUPRA.
               </p>
               <div style={{ display: "flex", gap: 14, marginTop: 34, flexWrap: "wrap" }}>
                 <Btn variant="primary" size="lg" onClick={onEnter}>Launch App</Btn>
@@ -420,6 +422,10 @@ export function LandingPage({ onEnter }) {
         </Section>
 
         <Section style={{ padding: "0 24px 90px" }}>
+          <Reveal>
+            <div style={{ fontFamily: C.mono, fontSize: "0.7rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>Everything, in one place</div>
+            <h2 style={{ fontFamily: C.display, fontSize: "1.9rem", fontWeight: 600, margin: "0 0 32px", letterSpacing: "-0.015em" }}>One engine. Not six subscriptions.</h2>
+          </Reveal>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 18 }}>
             {FEATURES.map((f, idx) => (
               <Reveal key={f.title} delay={idx * 0.07}>
@@ -549,7 +555,7 @@ export function LandingPage({ onEnter }) {
             }}>
               <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: "60%", height: 2, background: `linear-gradient(90deg, transparent, ${C.accent}, transparent)` }} />
               <h2 style={{ fontFamily: C.display, fontSize: "2rem", fontWeight: 600, margin: "0 0 14px", letterSpacing: "-0.015em" }}>
-                Ready to put your feed on autopilot?
+                Ready for one engine to run it all?
               </h2>
               <p style={{ color: C.text2, marginBottom: 32 }}>Connect your wallet and generate your first post in under a minute.</p>
               <Btn variant="primary" size="lg" onClick={onEnter}>Launch App</Btn>
