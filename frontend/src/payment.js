@@ -16,7 +16,6 @@
  *   { from, to, value (em octas como string) }
  */
 
-// === CONFIGURAÇÃO API (FIX PARA VERCEL + TUNNEL) ===
 const apiBase = __API_URL__ || "";
 
 const OCTAS_PER_SUPRA = 1e8;
@@ -117,6 +116,7 @@ async function sendSupraTransfer(fromAddress, toAddress, amountSupra) {
       try {
         console.log("[payment] Tentando createRawTransactionData + sendTransaction...");
 
+        // BCS helpers
         function bcsU64(value) {
           const big = BigInt(value);
           const buf = new Uint8Array(8);
