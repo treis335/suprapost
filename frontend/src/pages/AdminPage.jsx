@@ -17,6 +17,7 @@ function authHeaders() {
 export function AdminPage({ walletAddress }) {
   const [items, setItems] = useState([]);
   const [history, setHistory] = useState([]);
+  const [recon, setRecon] = useState(null);
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState(null);
   const [error, setError] = useState(null);
@@ -26,9 +27,11 @@ export function AdminPage({ walletAddress }) {
     Promise.all([
       fetch("/api/admin/withdrawals", { headers: authHeaders() }).then(r => r.json()),
       fetch("/api/admin/withdrawals/history", { headers: authHeaders() }).then(r => r.json()),
-    ]).then(([pending, hist]) => {
+      fetch("/api/admin/reconciliation", { headers: authHeaders() }).then(r => r.json()),
+    ]).then(([pending, hist, rec]) => {
       if (pending.ok) setItems(pending.withdrawals);
       if (hist.ok) setHistory(hist.withdrawals);
+      if (rec.ok) setRecon(rec);
     }).catch(() => {}).finally(() => setLoading(false));
   }
 
@@ -77,6 +80,24 @@ export function AdminPage({ walletAddress }) {
         <div style={{ fontSize: "1.5rem", fontWeight: 700, fontFamily: C.display, letterSpacing: "-0.02em" }}>Admin</div>
         <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 4 }}>Pending referral-credit withdrawals. Pay sends SUPRA from this wallet via StarKey.</div>
       </div>
+
+      {recon && (
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontSize: "0.72rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Reconciliation</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, fontSize: "0.82rem" }}>
+            <div><div style={{ color: C.muted, fontSize: "0.7rem" }}>Deposited (ledger)</div><div style={{ fontFamily: C.mono, color: C.text }}>{fmt(recon.ledger.totalDepositedBalance)}</div></div>
+            <div><div style={{ color: C.muted, fontSize: "0.7rem" }}>Paid out</div><div style={{ fontFamily: C.mono, color: C.text }}>{fmt(recon.ledger.totalPaidOut)}</div></div>
+            <div><div style={{ color: C.muted, fontSize: "0.7rem" }}>On-chain balance</div><div style={{ fontFamily: C.mono, color: C.text }}>{recon.onChain.balance != null ? fmt(recon.onChain.balance) : "—"}</div></div>
+            <div>
+              <div style={{ color: C.muted, fontSize: "0.7rem" }}>Drift</div>
+              <div style={{ fontFamily: C.mono, color: recon.drift == null ? C.muted : Math.abs(recon.drift) < 0.01 ? C.supra : C.danger }}>
+                {recon.drift != null ? fmt(recon.drift) : "—"}
+              </div>
+            </div>
+          </div>
+          {recon.onChain.error && <div style={{ fontSize: "0.72rem", color: C.warn, marginTop: 10 }}>Couldn't fetch on-chain balance: {recon.onChain.error}</div>}
+        </Card>
+      )}
 
       {error && <div style={{ background: `${C.danger}14`, border: `1px solid ${C.danger}44`, borderRadius: 12, padding: "12px 16px", fontSize: "0.85rem", color: C.danger }}>{error}</div>}
 

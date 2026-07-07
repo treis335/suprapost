@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
+const rateLimit = require("express-rate-limit");
 const { v4: uuidv4 } = require("uuid");
 const { initDB } = require("./db");
 const { runGenerationCycle } = require("./engine");
@@ -10,6 +11,7 @@ const { startAutomation, stopAutomation, resumeAllAutomations } = require("./sch
 const { publishToChannels } = require("./channels");
 const { createNonce, verifyAndIssueToken, requireAuth, getPendingRef } = require("./auth");
 const { createDepositIntent, getIntentStatus, pollForDeposits, confirmDepositByTxHash } = require("./deposits");
+const { getBalance } = require("./supraClient");
 const { requestWithdrawal, listAllPending, listAllHistory, markWithdrawal } = require("./withdrawals");
 const { cleanOldImages, IMAGES_DIR } = require("./imageGen");
 
@@ -57,6 +59,22 @@ async function main() {
   app.use(cors());
   app.use(express.json({ limit: "20mb" })); // generous limit for base64 image uploads
 
+  // ── Rate limiting on sensitive routes ──
+  // Auth: generous enough for real sign-in flows/retries, tight enough to
+  // block brute-force nonce/signature guessing.
+  const authLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000, max: 20,
+    standardHeaders: true, legacyHeaders: false,
+    message: { ok: false, error: "Too many sign-in attempts — please wait a few minutes." },
+  });
+  // Money-moving routes: deposits/withdrawals should never need rapid-fire calls.
+  const moneyLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000, max: 30,
+    standardHeaders: true, legacyHeaders: false,
+    keyGenerator: (req) => req.walletAddress || req.ip,
+    message: { ok: false, error: "Too many requests — please wait a few minutes." },
+  });
+
   // Serve generated/uploaded images so Discord embeds and previews work
   app.use("/images", express.static(IMAGES_DIR));
 
@@ -84,14 +102,14 @@ async function main() {
   // a JWT the frontend then sends as "Authorization: Bearer <token>" on
   // every other request.
   // ════════════════════════════════════════════════════════
-  app.post("/api/auth/nonce", (req, res) => {
+  app.post("/api/auth/nonce", authLimiter, (req, res) => {
     const { address, ref } = req.body;
     if (!address) return res.status(400).json({ ok: false, error: "Missing wallet address" });
     const message = createNonce(address, ref); // pass referrer to store temporarily
     res.json({ ok: true, message });
   });
 
-  app.post("/api/auth/verify", async (req, res) => {
+  app.post("/api/auth/verify", authLimiter, async (req, res) => {
     const { address, signature, publicKey } = req.body;
     if (!address || !signature) return res.status(400).json({ ok: false, error: "Missing address or signature" });
     const result = await verifyAndIssueToken(address, signature, publicKey);
@@ -218,7 +236,7 @@ async function main() {
   });
 
   // POST /api/wallet/withdraw — cash out referral credits only (never deposited balance)
-  app.post("/api/wallet/withdraw", requireAuth, async (req, res) => {
+  app.post("/api/wallet/withdraw", requireAuth, moneyLimiter, async (req, res) => {
     const { amount, toAddress } = req.body;
     const result = await requestWithdrawal(db, req.walletAddress, amount, toAddress);
     if (!result.ok) return res.status(400).json(result);
@@ -261,12 +279,62 @@ async function main() {
     res.json(result);
   });
 
+  // GET /api/admin/reconciliation — sanity check: what the DB thinks users
+  // deposited in total vs. what's actually sitting in the platform's
+  // on-chain deposit address right now (minus paid-out withdrawals). A
+  // large, unexplained gap here means something is wrong — a bug, a missed
+  // deposit, or (worse) a double-credit. Run this regularly, not just once.
+  app.get("/api/admin/reconciliation", requireAuth, requireAdmin, async (req, res) => {
+    await db.read();
+    let totalDepositedBalance = 0;
+    let totalCreditBalance = 0;
+    let totalPaidOut = 0;
+    let totalPendingWithdrawals = 0;
+
+    for (const user of Object.values(db.data.users || {})) {
+      totalDepositedBalance += user.wallet?.balance || 0;
+      totalCreditBalance += user.wallet?.creditBalance || 0;
+      for (const w of user.wallet?.withdrawals || []) {
+        if (w.status === "paid") totalPaidOut += w.amount;
+        if (w.status === "pending") totalPendingWithdrawals += w.amount;
+      }
+    }
+
+    let onChainBalance = null;
+    let onChainError = null;
+    try {
+      if (process.env.SUPRA_DEPOSIT_ADDRESS) {
+        onChainBalance = await getBalance(process.env.SUPRA_DEPOSIT_ADDRESS);
+      }
+    } catch (err) {
+      onChainError = err.message;
+    }
+
+    // What should be sitting in the platform wallet: all deposits made,
+    // minus whatever has already been paid out for referral withdrawals.
+    const expectedOnChain = onChainBalance != null ? +(totalDepositedBalance - totalPaidOut).toFixed(8) : null;
+    const drift = expectedOnChain != null ? +(onChainBalance - expectedOnChain).toFixed(8) : null;
+
+    res.json({
+      ok: true,
+      ledger: {
+        totalDepositedBalance: +totalDepositedBalance.toFixed(8),
+        totalCreditBalance: +totalCreditBalance.toFixed(8),
+        totalPaidOut: +totalPaidOut.toFixed(8),
+        totalPendingWithdrawals: +totalPendingWithdrawals.toFixed(8),
+      },
+      onChain: { balance: onChainBalance, error: onChainError },
+      expectedOnChain,
+      drift, // should be ~0; nonzero means investigate
+    });
+  });
+
   // ── Real, non-custodial deposits ──
   // Step 1: user requests an intent for an amount they want to deposit.
   // We hand back a precise amount (with a unique decimal fingerprint) and
   // our deposit address — the user then sends EXACTLY that amount from
   // their own wallet, paying their own gas.
-  app.post("/api/wallet/deposit/intent", requireAuth, async (req, res) => {
+  app.post("/api/wallet/deposit/intent", requireAuth, moneyLimiter, async (req, res) => {
     try {
       const amount = Number(req.body.amount);
       const intent = createDepositIntent(req.walletAddress, amount);
@@ -279,7 +347,7 @@ async function main() {
   // Step 2: frontend sends the tx hash after StarKey confirms the transaction.
   // We fetch the transaction from the chain, verify it, and credit the user.
   // This avoids the server needing to poll the RPC — the browser already has the hash.
-  app.post("/api/wallet/deposit/confirm", requireAuth, async (req, res) => {
+  app.post("/api/wallet/deposit/confirm", requireAuth, moneyLimiter, async (req, res) => {
     const { intentId, txHash } = req.body;
     if (!intentId || !txHash) return res.status(400).json({ ok: false, error: "Missing intentId or txHash" });
 

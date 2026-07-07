@@ -13,6 +13,22 @@ const JWT_SECRET  = process.env.JWT_SECRET || "dev-only-insecure-secret-change-m
 const JWT_EXPIRY  = "7d";
 const NONCE_TTL_MS = 5 * 60 * 1000; // 5 min
 
+// Supra is a Move-based L1 (Aptos-family). Account addresses are derived from
+// the public key as SHA3-256(publicKey || schemeByte), schemeByte = 0x00 for
+// single-signer Ed25519. This lets us verify that a supplied publicKey really
+// belongs to the address being signed in as — not just that *some* keypair
+// produced a valid signature. Without this check, anyone could claim any
+// address and authenticate with their own unrelated keypair.
+const ED25519_SINGLE_SIGNER_SCHEME = 0x00;
+
+function deriveAddressFromPublicKey(publicKeyHex) {
+  const pubKeyBytes = hexToBytes(publicKeyHex);
+  const preimage = new Uint8Array(pubKeyBytes.length + 1);
+  preimage.set(pubKeyBytes, 0);
+  preimage[pubKeyBytes.length] = ED25519_SINGLE_SIGNER_SCHEME;
+  return createHash("sha3-256").update(Buffer.from(preimage)).digest("hex");
+}
+
 // nonce store: normalised address → { nonce, message, expiresAt, ref }
 const pendingNonces = new Map();
 // pending referrals: normalised address → referrer address (cleared after first login)
@@ -62,10 +78,23 @@ async function verifyAndIssueToken(address, signature, publicKey) {
     try {
       const valid = await verifySupraSignature(pending.message, signature, publicKey);
       if (!valid) return { ok: false, error: "Invalid signature." };
+
+      // Critical: confirm the supplied publicKey actually belongs to the
+      // address being signed in as. Without this, a valid signature from
+      // ANY keypair would authenticate as ANY claimed address.
+      const derived = deriveAddressFromPublicKey(publicKey);
+      if (derived !== key) {
+        console.warn(`[auth] publicKey does not derive to claimed address. claimed=${key} derived=${derived}`);
+        return { ok: false, error: "Public key does not match the wallet address." };
+      }
     } catch (err) {
       console.warn("[auth] Ed25519 verify error:", err.message, "— falling back to nonce-only");
       // Fall through: nonce TTL + single-use is sufficient protection
     }
+  } else {
+    // No publicKey supplied — weaker path, relies only on nonce TTL + single-use.
+    // Flagged loudly so this is visible in logs/monitoring rather than silent.
+    console.warn(`[auth] No publicKey supplied for ${key} — authenticated on nonce-only fallback.`);
   }
 
   pendingNonces.delete(key); // single-use

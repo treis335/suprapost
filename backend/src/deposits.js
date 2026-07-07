@@ -134,6 +134,23 @@ async function pollForDeposits(db) {
 async function confirmDepositByTxHash(db, intent, txHash) {
   if (intent.fulfilled) return { ok: true, alreadyCredited: true };
 
+  // Claim the intent synchronously, before any `await`. JS is single-threaded,
+  // so this line always runs to completion before another concurrent call to
+  // this function gets a chance to run — closing the double-credit race where
+  // two near-simultaneous confirm calls (retry, double-click) both pass the
+  // `fulfilled` check before either one finishes crediting.
+  if (intent.claimed) return { ok: false, error: "This deposit is already being processed." };
+  intent.claimed = true;
+
+  try {
+    return await doConfirm(db, intent, txHash);
+  } catch (err) {
+    intent.claimed = false; // nothing was credited — safe to retry
+    throw err;
+  }
+}
+
+async function doConfirm(db, intent, txHash) {
   let txData = null;
   try {
     txData = await getTransaction(txHash);
@@ -154,6 +171,7 @@ async function confirmDepositByTxHash(db, intent, txHash) {
       // 2-octa tolerance for rounding
       if (Math.abs(amountSupra - expected) > 2e-8) {
         console.warn(`[deposits] Wrong amount: expected ${expected}, received ${amountSupra}`);
+        intent.claimed = false; // not a real credit attempt — let the user retry
         return {
           ok: false,
           error: `Amount mismatch: expected ${expected} SUPRA, received ${amountSupra} SUPRA`,
