@@ -1,6 +1,7 @@
 import { getSession, clearSession } from "../wallet";
 
-const BASE = import.meta.env.VITE_API_URL || "";
+// v2 — reads VITE_API_URL at build time
+const BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
 import { getSession, clearSession } from "../wallet";
 
