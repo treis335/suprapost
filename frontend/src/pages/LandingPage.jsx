@@ -7,9 +7,17 @@ import { Btn } from "../components/ui/Btn";
    LANDING PAGE — the product's storefront.
    Signature: the OrbitRing from inside the app, animated through
    the real posting cycle — the hero demonstrates the product
-   instead of illustrating it. Everything else stays quiet and
-   disciplined around that one moving piece.
+   instead of illustrating it.
+
+   Palette: the app's own indigo/teal/emerald system, extended
+   with a warm flare (pink→amber) used sparingly in the landing
+   only — gradient mesh, headline accents — so the storefront
+   feels a shade more vivid than the product itself without
+   breaking the shared identity.
 ============================================================ */
+
+const FLARE = "#ff6fa8";
+const FLARE2 = "#ffb86c";
 
 const CYCLE = [
   { label: "Writing", sublabel: "AI drafting the post" },
@@ -109,6 +117,7 @@ function useDemo() {
   const [phase, setPhase] = useState("idle"); // idle → writing → scoring → posting → done
   const [typed, setTyped] = useState("");
   const [score, setScore] = useState(0);
+  const [postedCount, setPostedCount] = useState(0);
   const timers = useRef([]);
 
   function clearTimers() { timers.current.forEach(clearTimeout); timers.current = []; }
@@ -116,7 +125,7 @@ function useDemo() {
   function run() {
     clearTimers();
     const text = DEMO_TEMPLATES[Math.floor(Math.random() * DEMO_TEMPLATES.length)].replace("{niche}", niche || "your niche");
-    setTyped(""); setScore(0); setPhase("writing");
+    setTyped(""); setScore(0); setPostedCount(0); setPhase("writing");
 
     let i = 0;
     const typeStep = () => {
@@ -144,13 +153,16 @@ function useDemo() {
 
   useEffect(() => {
     if (phase !== "posting") return;
-    timers.current.push(setTimeout(() => setPhase("done"), 900));
+    [1, 2, 3].forEach(n => {
+      timers.current.push(setTimeout(() => setPostedCount(n), n * 420));
+    });
+    timers.current.push(setTimeout(() => setPhase("done"), 3 * 420 + 500));
     return clearTimers;
   }, [phase]);
 
   useEffect(() => () => clearTimers(), []);
 
-  return { niche, setNiche, phase, typed, score, run };
+  return { niche, setNiche, phase, typed, score, postedCount, run };
 }
 
 function AIImageThumb({ variant = "chart", colors, seed = 0 }) {
@@ -197,74 +209,93 @@ function AIImageThumb({ variant = "chart", colors, seed = 0 }) {
 }
 
 function LiveDemo() {
-  const { niche, setNiche, phase, typed, score, run } = useDemo();
+  const { niche, setNiche, phase, typed, score, postedCount, run } = useDemo();
   const busy = phase !== "idle" && phase !== "done";
 
   return (
-    <div style={{
-      background: `linear-gradient(180deg, ${C.surface2}, ${C.surface})`, border: `1px solid ${C.border}`,
-      borderRadius: 22, padding: "28px 26px", boxShadow: "0 30px 60px -32px rgba(0,0,0,0.6)",
+    <div className="glass" style={{
+      border: `1px solid ${C.borderLight}`, borderRadius: 24, overflow: "hidden",
+      boxShadow: "0 40px 80px -40px rgba(0,0,0,0.65)",
     }}>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 22 }}>
-        <input
-          value={niche} onChange={e => setNiche(e.target.value)} placeholder="Type your niche… e.g. DeFi trading"
-          style={{
-            flex: 1, minWidth: 200, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 11,
-            color: C.text, fontFamily: C.sans, fontSize: "0.88rem", padding: "12px 14px", outline: "none",
-          }}
-        />
-        <Btn variant="primary" onClick={run} disabled={busy}>{busy ? "Generating…" : "▶ Try it live"}</Btn>
+      {/* device chrome */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 18px", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f56" }} />
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ffbd2e" }} />
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#27c93f" }} />
+        <div style={{ marginLeft: 10, fontSize: "0.72rem", color: C.muted, fontFamily: C.mono }}>content-engine · live preview</div>
       </div>
 
-      <div style={{ minHeight: 210 }}>
-        {phase === "idle" && (
-          <div style={{ fontSize: "0.86rem", color: C.muted, padding: "30px 4px" }}>
-            Type any niche above and watch the AI draft, score, and publish a post — right here.
-          </div>
-        )}
+      <div style={{ padding: "24px 26px 28px" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 22 }}>
+          <input
+            value={niche} onChange={e => setNiche(e.target.value)} placeholder="Type your niche… e.g. DeFi trading"
+            style={{
+              flex: 1, minWidth: 200, background: "rgba(0,0,0,0.25)", border: `1px solid ${C.border}`, borderRadius: 11,
+              color: C.text, fontFamily: C.sans, fontSize: "0.88rem", padding: "12px 14px", outline: "none",
+            }}
+          />
+          <Btn variant="primary" onClick={run} disabled={busy}>{busy ? "Generating…" : "▶ Try it live"}</Btn>
+        </div>
 
-        {phase !== "idle" && (
-          <div>
-            <div style={{ fontSize: "0.72rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Draft</div>
-            <div style={{
-              fontFamily: C.mono, fontSize: "0.92rem", color: C.text, lineHeight: 1.65, minHeight: 60,
-              background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px",
-            }}>
-              {typed}{phase === "writing" && <span style={{ opacity: 0.6 }}>▌</span>}
+        <div style={{ minHeight: 220 }}>
+          {phase === "idle" && (
+            <div style={{ fontSize: "0.86rem", color: C.muted, padding: "30px 4px" }}>
+              Type any niche above and watch the AI draft, score, and publish a post — right here.
             </div>
+          )}
 
-            {(phase === "scoring" || phase === "posting" || phase === "done") && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: C.muted, marginBottom: 6 }}>
-                  <span>SELF-CRITIQUE SCORE</span><span style={{ fontFamily: C.mono, color: C.supra }}>{score.toFixed(1)}/10</span>
-                </div>
-                <div style={{ height: 6, borderRadius: 3, background: C.border, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${score * 10}%`, background: `linear-gradient(90deg, ${C.accent}, ${C.supra})`, transition: "width 0.05s linear" }} />
-                </div>
+          {phase !== "idle" && (
+            <div>
+              <div style={{ fontSize: "0.72rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Draft</div>
+              <div style={{
+                fontFamily: C.mono, fontSize: "0.92rem", color: C.text, lineHeight: 1.65, minHeight: 60,
+                background: "rgba(0,0,0,0.25)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px",
+              }}>
+                {typed}{phase === "writing" && <span style={{ opacity: 0.6 }}>▌</span>}
               </div>
-            )}
 
-            {(phase === "posting" || phase === "done") && (
-              <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
-                {PLATFORMS.slice(0, 3).map((p, idx) => (
-                  <div key={p.id} style={{
-                    display: "flex", alignItems: "center", gap: 7, padding: "8px 13px", borderRadius: 999,
-                    background: `${p.color}18`, border: `1px solid ${p.color}44`, fontSize: "0.78rem", color: C.text,
-                    opacity: phase === "done" || true ? 1 : 0,
-                    animation: `fu 0.4s cubic-bezier(.16,1,.3,1) ${idx * 0.15}s both`,
-                  }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill={p.color}><path d={p.path} /></svg>
-                    {phase === "done" ? "Published" : "Posting…"}
+              {(phase === "scoring" || phase === "posting" || phase === "done") && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: C.muted, marginBottom: 6 }}>
+                    <span>SELF-CRITIQUE SCORE</span><span style={{ fontFamily: C.mono, color: C.supra }}>{score.toFixed(1)}/10</span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div style={{ height: 6, borderRadius: 3, background: C.border, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${score * 10}%`, background: `linear-gradient(90deg, ${C.accent}, ${C.supra})`, transition: "width 0.05s linear" }} />
+                  </div>
+                </div>
+              )}
 
-            {phase === "done" && (
-              <div style={{ marginTop: 16, fontFamily: C.mono, fontSize: "0.8rem", color: C.warn }}>− 1.00 SUPRA charged</div>
-            )}
-          </div>
-        )}
+              {(phase === "posting" || phase === "done") && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 18 }}>
+                  {PLATFORMS.slice(0, 3).map((p, idx) => {
+                    const isPosted = postedCount > idx || phase === "done";
+                    const isActive = postedCount === idx && phase === "posting";
+                    return (
+                      <div key={p.id} style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: 10,
+                        background: isPosted ? `${p.color}14` : "rgba(255,255,255,0.02)",
+                        border: `1px solid ${isPosted ? p.color + "44" : C.border}`, fontSize: "0.82rem", color: C.text,
+                        transition: "background 0.3s, border-color 0.3s",
+                      }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill={p.color}><path d={p.path} /></svg>
+                        <span style={{ flex: 1 }}>{p.name}</span>
+                        {isPosted
+                          ? <span style={{ color: C.supra, fontSize: "0.76rem", display: "flex", alignItems: "center", gap: 4 }}>✓ Published</span>
+                          : isActive
+                            ? <span style={{ color: C.muted, fontSize: "0.76rem" }}>Posting…</span>
+                            : <span style={{ color: C.muted, fontSize: "0.76rem", opacity: 0.5 }}>Queued</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {phase === "done" && (
+                <div style={{ marginTop: 16, fontFamily: C.mono, fontSize: "0.8rem", color: C.warn }}>− 1.00 SUPRA charged</div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -298,28 +329,39 @@ export function LandingPage({ onEnter }) {
         @keyframes fu { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes floatBlob { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-3%,4%) scale(1.06); } }
         @keyframes floatBlob2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(4%,-3%) scale(1.08); } }
+        @keyframes floatBlob3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-2%,-5%) scale(1.05); } }
         .glow-blob-a { animation: floatBlob 16s ease-in-out infinite; }
         .glow-blob-b { animation: floatBlob2 19s ease-in-out infinite; }
+        .glow-blob-c { animation: floatBlob3 22s ease-in-out infinite; }
         .feature-card { transition: transform 0.25s cubic-bezier(.16,1,.3,1), border-color 0.25s, box-shadow 0.25s; }
         .feature-card:hover { transform: translateY(-5px); border-color: ${C.borderLight}; box-shadow: 0 20px 40px -24px rgba(0,0,0,0.6); }
         .step-card { transition: transform 0.25s, border-color 0.25s; }
         .step-card:hover { transform: translateY(-4px); border-color: ${C.accent}55; }
+        .glass { background: rgba(22,27,42,0.55); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
         @media (max-width: 780px) {
           .hero-grid { grid-template-columns: 1fr !important; }
           .hero-ring { order: -1; margin-bottom: 12px; }
         }
       `}</style>
 
+      {/* subtle grid texture for depth */}
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", opacity: 0.5,
+        backgroundImage: `linear-gradient(${C.border}22 1px, transparent 1px), linear-gradient(90deg, ${C.border}22 1px, transparent 1px)`,
+        backgroundSize: "64px 64px", maskImage: "radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 90%)",
+      }} />
+
       <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" }}>
-        <div className="glow-blob-a" style={{ position: "absolute", top: "-12%", left: "-8%", width: 560, height: 560, borderRadius: "50%", background: `radial-gradient(circle, ${C.accent}2e, transparent 70%)`, filter: "blur(10px)" }} />
-        <div className="glow-blob-b" style={{ position: "absolute", top: "18%", right: "-14%", width: 640, height: 640, borderRadius: "50%", background: `radial-gradient(circle, ${C.accent2}22, transparent 70%)`, filter: "blur(10px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", left: "30%", width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${C.supra}14, transparent 70%)`, filter: "blur(10px)" }} />
+        <div className="glow-blob-a" style={{ position: "absolute", top: "-12%", left: "-8%", width: 560, height: 560, borderRadius: "50%", background: `radial-gradient(circle, ${C.accent}30, transparent 70%)`, filter: "blur(10px)" }} />
+        <div className="glow-blob-b" style={{ position: "absolute", top: "14%", right: "-14%", width: 640, height: 640, borderRadius: "50%", background: `radial-gradient(circle, ${C.accent2}24, transparent 70%)`, filter: "blur(10px)" }} />
+        <div className="glow-blob-c" style={{ position: "absolute", top: "42%", left: "22%", width: 460, height: 460, borderRadius: "50%", background: `radial-gradient(circle, ${FLARE}1c, transparent 70%)`, filter: "blur(14px)" }} />
+        <div style={{ position: "absolute", bottom: "-10%", left: "34%", width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${C.supra}14, transparent 70%)`, filter: "blur(10px)" }} />
       </div>
 
       <div style={{ position: "relative", zIndex: 1 }}>
-        <div style={{
-          position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(14px)",
-          background: scrolled ? `${C.bg}cc` : "transparent",
+        <div className="glass" style={{
+          position: "sticky", top: 0, zIndex: 20,
+          background: scrolled ? "rgba(10,13,20,0.72)" : "transparent",
           borderBottom: `1px solid ${scrolled ? C.border : "transparent"}`,
           transition: "background 0.3s, border-color 0.3s",
         }}>
@@ -332,40 +374,42 @@ export function LandingPage({ onEnter }) {
           </Section>
         </div>
 
-        <Section style={{ padding: "64px 24px 70px" }}>
+        <Section style={{ padding: "68px 24px 70px" }}>
           <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1.15fr 0.85fr", gap: 56, alignItems: "center" }}>
             <div>
               <div style={{
-                display: "inline-flex", alignItems: "center", gap: 8, fontFamily: C.mono, fontSize: "0.7rem", color: C.accent2,
-                textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 22, padding: "6px 12px",
-                border: `1px solid ${C.accent2}33`, borderRadius: 999, background: `${C.accent2}0d`,
+                display: "inline-flex", alignItems: "center", gap: 8, fontFamily: C.mono, fontSize: "0.7rem",
+                textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 24, padding: "6px 12px",
+                border: `1px solid ${C.accent2}33`, borderRadius: 999,
+                background: `linear-gradient(90deg, ${C.accent2}14, ${FLARE}10)`,
               }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.accent2, boxShadow: `0 0 8px ${C.accent2}` }} />
-                The Content Engine · one login, everything included
+                <span style={{ color: C.accent2 }}>The Content Engine</span>
+                <span style={{ color: C.muted }}>· one login, everything included</span>
               </div>
-              <h1 style={{ fontFamily: C.display, fontSize: "clamp(2.4rem, 5.6vw, 3.8rem)", lineHeight: 1.04, letterSpacing: "-0.025em", margin: 0, fontWeight: 600 }}>
+              <h1 style={{ fontFamily: C.display, fontSize: "clamp(2.5rem, 5.8vw, 4rem)", lineHeight: 1.03, letterSpacing: "-0.028em", margin: 0, fontWeight: 650 }}>
                 Not another posting tool.<br />Your entire <span style={{
-                  background: `linear-gradient(90deg, ${C.accent}, ${C.accent2})`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+                  background: `linear-gradient(90deg, ${C.accent}, ${C.accent2} 55%, ${FLARE})`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
                 }}>content engine.</span>
               </h1>
-              <p style={{ fontSize: "1.1rem", color: C.text2, lineHeight: 1.65, marginTop: 24, maxWidth: 500 }}>
+              <p style={{ fontSize: "1.1rem", color: C.text2, lineHeight: 1.65, marginTop: 26, maxWidth: 500 }}>
                 Writing, images, scheduling, publishing, payments, even
                 referral payouts — SupraPost runs the whole content operation
                 from one place, on its own server, paid for in SUPRA.
               </p>
-              <div style={{ display: "flex", gap: 14, marginTop: 34, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 14, marginTop: 36, flexWrap: "wrap" }}>
                 <Btn variant="primary" size="lg" onClick={onEnter}>Launch App</Btn>
                 <Btn variant="ghost" size="lg" onClick={() => document.getElementById("how").scrollIntoView({ behavior: "smooth" })}>See how it works</Btn>
               </div>
             </div>
 
             <div className="hero-ring" style={{ display: "flex", justifyContent: "center" }}>
-              <div style={{
-                padding: 36, borderRadius: 26, background: `linear-gradient(180deg, ${C.surface2}, ${C.surface})`,
-                border: `1px solid ${C.border}`, boxShadow: `0 30px 70px -32px rgba(0,0,0,0.65), 0 0 0 1px ${C.border} inset`,
+              <div className="glass" style={{
+                padding: 38, borderRadius: 28,
+                border: `1px solid ${C.borderLight}`, boxShadow: `0 40px 90px -36px rgba(0,0,0,0.7), 0 0 60px -20px ${C.accent}30`,
                 position: "relative",
               }}>
-                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "26px 26px 0 0", background: `linear-gradient(90deg, transparent, ${C.accent}, transparent)` }} />
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "28px 28px 0 0", background: `linear-gradient(90deg, transparent, ${C.accent}, ${FLARE}, transparent)` }} />
                 <OrbitRing running progress={progress} size={200} label={stage.label} sublabel={stage.sublabel} />
               </div>
             </div>
@@ -377,7 +421,7 @@ export function LandingPage({ onEnter }) {
               background: C.border, borderRadius: 16, overflow: "hidden", border: `1px solid ${C.border}`,
             }}>
               {STATS.map(s => (
-                <div key={s.label} style={{ background: C.surface, padding: "22px 18px", textAlign: "center" }}>
+                <div key={s.label} className="glass" style={{ padding: "22px 18px", textAlign: "center" }}>
                   <div style={{ fontFamily: C.mono, fontSize: "1.5rem", fontWeight: 600, color: C.text }}>{s.value}</div>
                   <div style={{ fontSize: "0.72rem", color: C.muted, marginTop: 4 }}>{s.label}</div>
                 </div>
@@ -411,7 +455,7 @@ export function LandingPage({ onEnter }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 18 }}>
             {STEPS.map((s, idx) => (
               <Reveal key={s.n} delay={idx * 0.08}>
-                <div className="step-card" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: 24, height: "100%", boxSizing: "border-box" }}>
+                <div className="step-card glass" style={{ border: `1px solid ${C.border}`, borderRadius: 18, padding: 24, height: "100%", boxSizing: "border-box" }}>
                   <div style={{ fontFamily: C.mono, fontSize: "0.8rem", color: C.accent, marginBottom: 16 }}>{s.n}</div>
                   <div style={{ fontWeight: 600, marginBottom: 9, fontSize: "1rem" }}>{s.title}</div>
                   <div style={{ fontSize: "0.87rem", color: C.text2, lineHeight: 1.58 }}>{s.body}</div>
@@ -429,8 +473,8 @@ export function LandingPage({ onEnter }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 18 }}>
             {FEATURES.map((f, idx) => (
               <Reveal key={f.title} delay={idx * 0.07}>
-                <div className="feature-card" style={{
-                  background: `linear-gradient(180deg, ${C.surface2}, ${C.surface})`, border: `1px solid ${C.border}`,
+                <div className="feature-card glass" style={{
+                  border: `1px solid ${C.border}`,
                   borderRadius: 18, padding: 26, height: "100%", boxSizing: "border-box",
                 }}>
                   <div style={{
@@ -467,7 +511,7 @@ export function LandingPage({ onEnter }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 18 }}>
             {EXAMPLE_POSTS.map((p, idx) => (
               <Reveal key={p.handle} delay={idx * 0.08}>
-                <div className="feature-card" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18, height: "100%", boxSizing: "border-box" }}>
+                <div className="feature-card glass" style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: 18, height: "100%", boxSizing: "border-box" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                     <div style={{
                       width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(135deg, ${p.color}, ${C.accent2})`,
@@ -501,7 +545,7 @@ export function LandingPage({ onEnter }) {
             <div style={{ fontFamily: C.mono, fontSize: "0.7rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>The difference</div>
             <h2 style={{ fontFamily: C.display, fontSize: "1.9rem", fontWeight: 600, margin: "0 0 28px", letterSpacing: "-0.015em" }}>What you stop doing.</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18 }}>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: 26 }}>
+              <div className="glass" style={{ border: `1px solid ${C.border}`, borderRadius: 18, padding: 26 }}>
                 <div style={{ fontSize: "0.72rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>Doing it manually</div>
                 {["Write a post for every platform, every day", "Design or find an image for each one", "Log in and publish to each app separately", "Remember to do it again tomorrow"].map(t => (
                   <div key={t} style={{ display: "flex", gap: 10, fontSize: "0.88rem", color: C.text2, padding: "9px 0", borderTop: `1px solid ${C.border}` }}>
@@ -509,7 +553,7 @@ export function LandingPage({ onEnter }) {
                   </div>
                 ))}
               </div>
-              <div style={{ background: `linear-gradient(180deg, ${C.surface2}, ${C.surface})`, border: `1px solid ${C.accent}44`, borderRadius: 18, padding: 26, boxShadow: `0 20px 50px -30px ${C.accent}55` }}>
+              <div className="glass" style={{ border: `1px solid ${C.accent}44`, borderRadius: 18, padding: 26, boxShadow: `0 20px 50px -30px ${C.accent}55` }}>
                 <div style={{ fontSize: "0.72rem", color: C.accent, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>With SupraPost</div>
                 {["Set your profile and channels once", "AI writes and illustrates every post", "One engine publishes everywhere at once", "It keeps going without you, forever"].map(t => (
                   <div key={t} style={{ display: "flex", gap: 10, fontSize: "0.88rem", color: C.text, padding: "9px 0", borderTop: `1px solid ${C.border}` }}>
@@ -523,12 +567,13 @@ export function LandingPage({ onEnter }) {
 
         <Section style={{ padding: "0 24px 100px" }}>
           <Reveal>
-            <div style={{
-              background: `linear-gradient(135deg, ${C.accent}1f, ${C.accent2}10)`, border: `1px solid ${C.borderLight}`,
+            <div className="glass" style={{
+              border: `1px solid ${C.borderLight}`,
               borderRadius: 22, padding: "44px 36px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 36,
               position: "relative", overflow: "hidden",
             }}>
               <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: `radial-gradient(circle, ${C.accent}22, transparent 70%)` }} />
+              <div style={{ position: "absolute", bottom: -80, left: -40, width: 200, height: 200, borderRadius: "50%", background: `radial-gradient(circle, ${FLARE}18, transparent 70%)` }} />
               <div style={{ position: "relative" }}>
                 <div style={{ fontSize: "1.15rem", fontWeight: 600, marginBottom: 9 }}>Never touched an API key?</div>
                 <div style={{ fontSize: "0.9rem", color: C.text2, lineHeight: 1.62 }}>
@@ -549,11 +594,11 @@ export function LandingPage({ onEnter }) {
 
         <Section style={{ padding: "0 24px 100px", textAlign: "center" }}>
           <Reveal>
-            <div style={{
-              background: `linear-gradient(180deg, ${C.surface2}, ${C.surface})`, border: `1px solid ${C.border}`,
+            <div className="glass" style={{
+              border: `1px solid ${C.border}`,
               borderRadius: 26, padding: "56px 32px", position: "relative", overflow: "hidden",
             }}>
-              <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: "60%", height: 2, background: `linear-gradient(90deg, transparent, ${C.accent}, transparent)` }} />
+              <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: "60%", height: 2, background: `linear-gradient(90deg, transparent, ${C.accent}, ${FLARE}, transparent)` }} />
               <h2 style={{ fontFamily: C.display, fontSize: "2rem", fontWeight: 600, margin: "0 0 14px", letterSpacing: "-0.015em" }}>
                 Ready for one engine to run it all?
               </h2>
