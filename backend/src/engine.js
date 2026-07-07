@@ -78,17 +78,15 @@ async function runGenerationCycle(db, address, opts = {}) {
   user.stats.totalGenerations += 1;
 
   const post = {
-    id:            uuidv4(),
+    id:       uuidv4(),
     mode,
     text,
-    imageFilename,
-    imagePrompt,
-    imageUrl:      imageFilename ? `/images/${imageFilename}` : null,
-    scores,
-    avgScore:      avg,
-    time:          new Date().toISOString(),
-    auto:          autoPost,
-    results:       {},
+    imageUrl: imageFilename ? `/images/${imageFilename}` : null,
+    avgScore: avg,
+    time:     new Date().toISOString(),
+    auto:     autoPost,
+    results:  {},
+    // imagePrompt and per-channel scores omitted to keep storage lean
   };
 
   if (autoPost) {
@@ -115,6 +113,7 @@ async function runGenerationCycle(db, address, opts = {}) {
   }
 
   user.posts.unshift(post);
+  if (user.posts.length > 200) user.posts = user.posts.slice(0, 200); // keep last 200 only
   await db.write();
   return { ok: true, post, log };
 }

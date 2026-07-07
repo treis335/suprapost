@@ -447,6 +447,7 @@ async function main() {
       results,
     };
     user.posts.unshift(post);
+    if (user.posts.length > 200) user.posts = user.posts.slice(0, 200);
     if (anyPosted) user.stats.totalPosts += 1;
     await db.write();
 
