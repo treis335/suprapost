@@ -55,7 +55,23 @@ async function main() {
   cleanOldImages(7);
 
   const app = express();
-  app.use(cors());
+  // Allow requests from Vercel frontend and local dev
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,        // e.g. https://suprapost.vercel.app
+    "http://localhost:5173",          // local Vite dev
+    "http://localhost:3001",          // local production build
+  ].filter(Boolean);
+
+  app.use(cors({
+    origin: (origin, cb) => {
+      // Allow requests with no origin (curl, mobile apps, same-origin)
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      // In dev mode allow all
+      if (process.env.NODE_ENV !== "production") return cb(null, true);
+      cb(new Error(`CORS: origin ${origin} not allowed`));
+    },
+    credentials: true,
+  }));
   app.use(express.json({ limit: "20mb" })); // generous limit for base64 image uploads
 
 
