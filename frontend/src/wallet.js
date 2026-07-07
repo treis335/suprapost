@@ -47,6 +47,7 @@ function toHex(val) {
 function strToBytes(s) { return new TextEncoder().encode(s); }
 
 export async function signInWithWallet() {
+  const BASE = import.meta.env.VITE_API_URL || "";
   const p = getProvider();
   if (!p) throw new Error("StarKey not detected — install it from starkey.app");
 
@@ -67,7 +68,6 @@ export async function signInWithWallet() {
     // Check for referral code in URL (?ref=0x...)
     const urlRef = new URLSearchParams(window.location.search).get("ref") || null;
 
-    const BASE = import.meta.env.VITE_API_URL || "";
     const nonceRes = await fetch(`${BASE}/api/auth/nonce`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
