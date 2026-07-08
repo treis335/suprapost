@@ -86,11 +86,15 @@ export async function signInWithWallet() {
   // Try string first (works on both), fall back to bytes if rejected.
   let raw;
   try {
+    // Try bytes first — works on desktop and mobile StarKey
     try {
-      raw = await p.signMessage(message);
-    } catch (e1) {
-      // If string format fails, try Uint8Array
       raw = await p.signMessage(strToBytes(message));
+      // If signature comes back null, try string format
+      const sigCheck = raw?.signature ?? raw?.sig ?? raw?.data ?? raw;
+      if (!sigCheck) throw new Error("null signature from bytes format");
+    } catch (e1) {
+      console.log("[wallet] bytes format failed, trying string:", e1.message);
+      raw = await p.signMessage(message);
     }
   } catch (e) {
     const rejected = e.message?.toLowerCase().includes("reject") ||
