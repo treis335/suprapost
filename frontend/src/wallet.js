@@ -62,6 +62,9 @@ export async function signInWithWallet() {
 
   console.log("[wallet] Connected address:", address);
 
+  // Small delay to ensure StarKey popup is ready after connect
+  await new Promise(r => setTimeout(r, 300));
+
   // Step 2: get challenge from backend — use the SAME address we just got
   let message;
   try {
@@ -86,16 +89,7 @@ export async function signInWithWallet() {
   // Try string first (works on both), fall back to bytes if rejected.
   let raw;
   try {
-    // Try bytes first — works on desktop and mobile StarKey
-    try {
-      raw = await p.signMessage(strToBytes(message));
-      // If signature comes back null, try string format
-      const sigCheck = raw?.signature ?? raw?.sig ?? raw?.data ?? raw;
-      if (!sigCheck) throw new Error("null signature from bytes format");
-    } catch (e1) {
-      console.log("[wallet] bytes format failed, trying string:", e1.message);
-      raw = await p.signMessage(message);
-    }
+    raw = await p.signMessage(strToBytes(message));
   } catch (e) {
     const rejected = e.message?.toLowerCase().includes("reject") ||
       e.message?.toLowerCase().includes("cancel") || e.code === 4001;
@@ -104,18 +98,24 @@ export async function signInWithWallet() {
 
   console.log("[wallet] signMessage raw result:", JSON.stringify(raw)?.slice(0, 120));
 
-  // Extract signature — handle all formats StarKey has returned across versions
-  let signature = "";
-  let publicKey = "";
+  // Extract signature — handle all known StarKey response formats
+  let signature = toHex(raw?.signature ?? raw?.sig ?? raw?.data ?? raw ?? "");
+  let publicKey = toHex(raw?.publicKey ?? raw?.public_key ?? raw?.pubKey ?? "");
 
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    signature = toHex(raw.signature ?? raw.sig ?? raw.data ?? null);
-    publicKey  = toHex(raw.publicKey ?? raw.public_key ?? raw.pubKey ?? null);
-  } else if (raw) {
-    signature = toHex(raw);
+  // If signature is still null/empty, the StarKey popup was likely blocked.
+  // This can happen when signMessage is called too fast after connect().
+  // Wait briefly and retry once.
+  if (!signature) {
+    console.warn("[wallet] Empty signature — retrying after 500ms delay...");
+    await new Promise(r => setTimeout(r, 500));
+    try {
+      raw = await p.signMessage(strToBytes(message));
+      signature = toHex(raw?.signature ?? raw?.sig ?? raw?.data ?? raw ?? "");
+      publicKey = toHex(raw?.publicKey ?? raw?.public_key ?? raw?.pubKey ?? "");
+    } catch {}
   }
 
-  if (!signature) throw new Error("Wallet returned empty signature — please try again");
+  if (!signature) throw new Error("Wallet returned empty signature — please open StarKey and try again");
 
   console.log("[wallet] Signature obtained, verifying with backend...");
 
