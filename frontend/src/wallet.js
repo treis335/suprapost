@@ -82,18 +82,36 @@ export async function signInWithWallet() {
   }
 
   // Step 3: sign the challenge
+  // StarKey mobile expects a plain string; desktop accepts Uint8Array.
+  // Try string first (works on both), fall back to bytes if rejected.
   let raw;
   try {
-    raw = await p.signMessage(strToBytes(message));
+    try {
+      raw = await p.signMessage(message);
+    } catch (e1) {
+      // If string format fails, try Uint8Array
+      raw = await p.signMessage(strToBytes(message));
+    }
   } catch (e) {
     const rejected = e.message?.toLowerCase().includes("reject") ||
       e.message?.toLowerCase().includes("cancel") || e.code === 4001;
     throw new Error(rejected ? "Signing cancelled" : "Wallet signing failed: " + e.message);
   }
 
-  const signature = toHex(raw?.signature ?? raw?.sig ?? raw);
-  const publicKey = toHex(raw?.publicKey ?? raw?.public_key ?? raw?.pubKey ?? "");
-  if (!signature) throw new Error("Wallet returned empty signature");
+  console.log("[wallet] signMessage raw result:", JSON.stringify(raw)?.slice(0, 120));
+
+  // Extract signature — handle all formats StarKey has returned across versions
+  let signature = "";
+  let publicKey = "";
+
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    signature = toHex(raw.signature ?? raw.sig ?? raw.data ?? null);
+    publicKey  = toHex(raw.publicKey ?? raw.public_key ?? raw.pubKey ?? null);
+  } else if (raw) {
+    signature = toHex(raw);
+  }
+
+  if (!signature) throw new Error("Wallet returned empty signature — please try again");
 
   console.log("[wallet] Signature obtained, verifying with backend...");
 
