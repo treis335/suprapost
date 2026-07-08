@@ -87,43 +87,42 @@ export async function signInWithWallet() {
   // Step 3: sign the challenge
   // StarKey mobile expects a plain string; desktop accepts Uint8Array.
   // Try string first (works on both), fall back to bytes if rejected.
-  // StarKey desktop expects Uint8Array; StarKey mobile expects plain string.
-  const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
-  console.log("[wallet] isMobile:", isMobile);
-
+  // Try plain string first (works in StarKey Android browser + most versions)
+  // Fall back to Uint8Array for desktop StarKey versions that require it.
   let raw;
+  let signature = "";
+  let publicKey = "";
+
+  // Attempt 1: plain string
   try {
-    if (isMobile) {
-      raw = await p.signMessage(message);
-    } else {
-      raw = await p.signMessage(strToBytes(message));
-    }
+    raw = await p.signMessage(message);
+    console.log("[wallet] signMessage (string) raw result:", JSON.stringify(raw)?.slice(0, 120));
+    signature = toHex(raw?.signature ?? raw?.sig ?? raw?.data ?? raw ?? "");
+    publicKey = toHex(raw?.publicKey ?? raw?.public_key ?? raw?.pubKey ?? "");
   } catch (e) {
     const rejected = e.message?.toLowerCase().includes("reject") ||
       e.message?.toLowerCase().includes("cancel") || e.code === 4001;
-    throw new Error(rejected ? "Signing cancelled" : "Wallet signing failed: " + e.message);
+    if (rejected) throw new Error("Signing cancelled");
+    console.warn("[wallet] string format failed:", e.message);
   }
 
-  console.log("[wallet] signMessage raw result:", JSON.stringify(raw)?.slice(0, 120));
-
-  // Extract signature — handle all known StarKey response formats
-  let signature = toHex(raw?.signature ?? raw?.sig ?? raw?.data ?? raw ?? "");
-  let publicKey = toHex(raw?.publicKey ?? raw?.public_key ?? raw?.pubKey ?? "");
-
-  // If signature is still null/empty, retry with the other format
+  // Attempt 2: Uint8Array (desktop fallback)
   if (!signature) {
-    console.warn("[wallet] Empty signature — retrying with alternate format...");
-    await new Promise(r => setTimeout(r, 500));
     try {
-      raw = isMobile
-        ? await p.signMessage(strToBytes(message))
-        : await p.signMessage(message);
+      await new Promise(r => setTimeout(r, 300));
+      raw = await p.signMessage(strToBytes(message));
+      console.log("[wallet] signMessage (bytes) raw result:", JSON.stringify(raw)?.slice(0, 120));
       signature = toHex(raw?.signature ?? raw?.sig ?? raw?.data ?? raw ?? "");
       publicKey = toHex(raw?.publicKey ?? raw?.public_key ?? raw?.pubKey ?? "");
-    } catch {}
+    } catch (e) {
+      const rejected = e.message?.toLowerCase().includes("reject") ||
+        e.message?.toLowerCase().includes("cancel") || e.code === 4001;
+      if (rejected) throw new Error("Signing cancelled");
+      console.warn("[wallet] bytes format failed:", e.message);
+    }
   }
 
-  if (!signature) throw new Error("Wallet returned empty signature — please open StarKey and try again");
+  if (!signature) throw new Error("Wallet returned empty signature — please try again");
 
   console.log("[wallet] Signature obtained, verifying with backend...");
 
