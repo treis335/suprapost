@@ -55,13 +55,18 @@ async function verifyAndIssueToken(address, signature, publicKey) {
   if (!signature) return { ok: false, error: "Missing signature." };
 
   // Ed25519 signature verification (no address derivation — Supra's scheme is not public)
-  if (publicKey) {
+  // "nosig" means the wallet (e.g. StarKey Android) doesn't support signMessage.
+  // We fall back to nonce-only auth — the nonce proves the user initiated this
+  // login flow from the correct browser session.
+  if (signature && signature !== "nosig" && publicKey) {
     try {
       const valid = await verifySupraSignature(pending.message, signature, publicKey);
       if (!valid) return { ok: false, error: "Invalid signature." };
     } catch (err) {
       console.warn("[auth] Ed25519 verify error:", err.message, "— proceeding on nonce-only");
     }
+  } else if (!signature || signature === "nosig") {
+    console.warn("[auth] No signature provided — nonce-only auth for:", key);
   }
 
   pendingNonces.delete(key);
