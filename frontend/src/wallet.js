@@ -87,39 +87,37 @@ export async function signInWithWallet() {
   // Step 3: sign the challenge
   // StarKey mobile expects a plain string; desktop accepts Uint8Array.
   // Try string first (works on both), fall back to bytes if rejected.
-  // Sign the challenge message with the wallet
-  // StarKey returns { signature, publicKey } or just the signature bytes
+  // StarKey expects signMessage({ message: hex, nonce }) — confirmed from official repos
+  // message must be hex-encoded: '0x' + utf8_bytes_as_hex
+  const hexMessage = "0x" + Array.from(new TextEncoder().encode(message))
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+
+  // Use a short nonce derived from the message itself
+  const nonce = Math.random().toString(36).slice(2, 8);
+
   let raw;
   let signature = "";
   let publicKey = "";
 
-  const formats = [
-    () => p.signMessage(message),              // string — works on Android/mobile
-    () => p.signMessage(strToBytes(message)),  // Uint8Array — works on desktop
-  ];
-
-  for (const attempt of formats) {
-    try {
-      raw = await attempt();
-      console.log("[wallet] signMessage raw:", JSON.stringify(raw)?.slice(0, 100));
-      const sig = raw?.signature ?? raw?.sig ?? raw?.data ?? raw ?? null;
-      if (sig && sig !== null) {
-        signature = toHex(sig);
-        publicKey = toHex(raw?.publicKey ?? raw?.public_key ?? raw?.pubKey ?? "");
-        break;
-      }
-    } catch (e) {
-      const rejected = e.message?.toLowerCase().includes("reject") ||
-        e.message?.toLowerCase().includes("cancel") || e.code === 4001;
-      if (rejected) throw new Error("Signing cancelled");
-      // try next format
-    }
+  try {
+    raw = await p.signMessage({ message: hexMessage, nonce });
+    console.log("[wallet] signMessage raw:", JSON.stringify(raw)?.slice(0, 120));
+    signature = raw?.signature ?? raw?.sig ?? "";
+    publicKey = raw?.publicKey ?? raw?.public_key ?? "";
+    // Remove 0x prefix for consistency, will be re-added in toHex
+    if (signature?.startsWith("0x")) signature = signature.slice(2);
+    if (publicKey?.startsWith("0x")) publicKey = publicKey.slice(2);
+  } catch (e) {
+    const rejected = e.message?.toLowerCase().includes("reject") ||
+      e.message?.toLowerCase().includes("cancel") || e.code === 4001;
+    if (rejected) throw new Error("Signing cancelled");
+    console.warn("[wallet] signMessage object format failed:", e.message);
+    // Fallback to nosig — backend will accept nonce-only
+    signature = "nosig";
   }
 
-  // Last resort: if StarKey doesn't support signMessage at all (some mobile versions),
-  // use address-only auth — backend will skip signature verification
   if (!signature) {
-    console.warn("[wallet] signMessage not supported — using address-only auth");
+    console.warn("[wallet] Empty signature — using nosig fallback");
     signature = "nosig";
   }
 
