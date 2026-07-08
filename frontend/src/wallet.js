@@ -87,9 +87,17 @@ export async function signInWithWallet() {
   // Step 3: sign the challenge
   // StarKey mobile expects a plain string; desktop accepts Uint8Array.
   // Try string first (works on both), fall back to bytes if rejected.
+  // StarKey desktop expects Uint8Array; StarKey mobile expects plain string.
+  const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+  console.log("[wallet] isMobile:", isMobile);
+
   let raw;
   try {
-    raw = await p.signMessage(strToBytes(message));
+    if (isMobile) {
+      raw = await p.signMessage(message);
+    } else {
+      raw = await p.signMessage(strToBytes(message));
+    }
   } catch (e) {
     const rejected = e.message?.toLowerCase().includes("reject") ||
       e.message?.toLowerCase().includes("cancel") || e.code === 4001;
@@ -102,14 +110,14 @@ export async function signInWithWallet() {
   let signature = toHex(raw?.signature ?? raw?.sig ?? raw?.data ?? raw ?? "");
   let publicKey = toHex(raw?.publicKey ?? raw?.public_key ?? raw?.pubKey ?? "");
 
-  // If signature is still null/empty, the StarKey popup was likely blocked.
-  // This can happen when signMessage is called too fast after connect().
-  // Wait briefly and retry once.
+  // If signature is still null/empty, retry with the other format
   if (!signature) {
-    console.warn("[wallet] Empty signature — retrying after 500ms delay...");
+    console.warn("[wallet] Empty signature — retrying with alternate format...");
     await new Promise(r => setTimeout(r, 500));
     try {
-      raw = await p.signMessage(strToBytes(message));
+      raw = isMobile
+        ? await p.signMessage(strToBytes(message))
+        : await p.signMessage(message);
       signature = toHex(raw?.signature ?? raw?.sig ?? raw?.data ?? raw ?? "");
       publicKey = toHex(raw?.publicKey ?? raw?.public_key ?? raw?.pubKey ?? "");
     } catch {}
