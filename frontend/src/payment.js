@@ -16,7 +16,7 @@
  *   { from, to, value (em octas como string) }
  */
 
-const apiBase = __API_URL__ || "";
+const apiBase = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
 const OCTAS_PER_SUPRA = 1e8;
 

@@ -1,13 +1,9 @@
 import { getSession, clearSession } from "../wallet";
 
-// v2 — reads VITE_API_URL at build time
+// BASE is the backend URL.
+// In production (Vercel): set VITE_API_URL environment variable to your tunnel URL.
+// In development: leave empty — Vite proxies /api/* to localhost:3001.
 const BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-
-import { getSession, clearSession } from "../wallet";
-
-// In production with Vercel + Cloudflare tunnel, __API_URL__ is set at build time.
-// In local dev it's empty and calls go to /api (proxied to localhost:3001).
-const BASE = typeof __API_URL__ !== "undefined" && __API_URL__ ? __API_URL__ : "";
 
 function authHeaders() {
   const session = getSession();
@@ -15,13 +11,11 @@ function authHeaders() {
 }
 
 async function parseResponse(res) {
-  // If empty body (204, etc.) return ok indicator
   const text = await res.text();
   if (!text) return { ok: res.ok };
   try {
     return JSON.parse(text);
   } catch {
-    // Non-JSON response (error page, etc.)
     console.error("[api] Non-JSON response:", res.status, text.slice(0, 120));
     return { ok: false, error: `Server error ${res.status}` };
   }
