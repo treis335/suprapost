@@ -82,6 +82,34 @@ const GlobalStyle = () => (
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes scaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
     @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Mobile optimisations ── */
+    @media (max-width: 699px) {
+      /* Tighter cards */
+      .card-mobile { padding: 12px 13px !important; border-radius: 11px !important; }
+
+      /* Smaller base font */
+      body { font-size: 13px; }
+
+      /* Inputs more compact */
+      input, select, textarea {
+        font-size: 0.82rem !important;
+        padding: 8px 11px !important;
+      }
+
+      /* Buttons */
+      button { font-size: 0.8rem !important; }
+
+      /* Labels and hints */
+      .field-label { font-size: 0.68rem !important; }
+
+      /* Prevent iOS zoom on input focus */
+      input[type="text"], input[type="number"], input[type="password"],
+      input[type="email"], select, textarea {
+        font-size: 16px !important;
+        -webkit-text-size-adjust: 100%;
+      }
+    }
     .fade-up { animation: fadeUp 0.4s cubic-bezier(.2,.8,.2,1) both; }
     .scale-in { animation: scaleIn 0.3s cubic-bezier(.2,.8,.2,1) both; }
     input::placeholder, textarea::placeholder { color: ${C.muted}; }
@@ -1165,29 +1193,119 @@ export default function App() {
   /* ── Layouts ─────────────────────────────────────────────────────────── */
   if (isMobile) {
     return (
-      <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans }}>
+      <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
         <GlobalStyle />
         {toastEl}
         <LowBalanceBanner balance={wallet.balance + (wallet.creditBalance || 0)} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.85)", backdropFilter: "blur(10px)", position: "sticky", top: 0, zIndex: 100 }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: "1.1rem", fontFamily: C.display }}>Supra<span style={{ color: C.accent }}>Post</span></div>
-            <div style={{ fontSize: "0.62rem", color: C.muted }}>AI Social Automation</div>
+
+        {/* ── Top bar ── */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "10px 14px",
+          borderBottom: `1px solid ${C.border}`,
+          background: "rgba(10,8,20,0.92)",
+          backdropFilter: "blur(16px)",
+          position: "sticky", top: 0, zIndex: 100,
+          WebkitBackdropFilter: "blur(16px)",
+        }}>
+          {/* Logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: "1rem", fontWeight: 800, fontFamily: C.display, letterSpacing: "-0.03em" }}>
+              Supra<span style={{ color: C.accent }}>Post</span>
+            </span>
+            <span style={{
+              fontSize: "0.52rem", color: C.muted,
+              background: C.raised, border: `1px solid ${C.border}`,
+              borderRadius: 4, padding: "1px 5px", fontFamily: C.mono,
+              textTransform: "uppercase", letterSpacing: "0.06em",
+            }}>AI</span>
           </div>
-          <div style={{ display: "flex", gap: 7 }}>
-            <Pill color={C.accent2}>{shortAddress(session?.address)}</Pill>
-            <Pill color={C.supra}>⬡ {fmt(wallet.balance + (wallet.creditBalance || 0))}</Pill>
-            <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "ON" : "OFF"}</Pill>
+
+          {/* Status pills */}
+          <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 4,
+              background: C.raised, border: `1px solid ${C.border}`,
+              borderRadius: 20, padding: "3px 8px",
+              fontSize: "0.6rem", fontFamily: C.mono, color: C.supra, fontWeight: 600,
+            }}>
+              ⬡ {fmt(wallet.balance + (wallet.creditBalance || 0))}
+            </div>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 4,
+              background: automation.running ? `${C.supra}18` : C.raised,
+              border: `1px solid ${automation.running ? C.supra + "44" : C.border}`,
+              borderRadius: 20, padding: "3px 8px",
+              fontSize: "0.6rem", color: automation.running ? C.supra : C.muted, fontWeight: 600,
+            }}>
+              <span style={{
+                width: 5, height: 5, borderRadius: "50%",
+                background: automation.running ? C.supra : C.muted,
+                animation: automation.running ? "softPulse 1.5s ease-in-out infinite" : "none",
+                display: "inline-block", flexShrink: 0,
+              }} />
+              {automation.running ? "ON" : "OFF"}
+            </div>
           </div>
         </div>
-        <div key={tab} className="fade-up" style={{ flex: 1, padding: "18px 16px 96px", overflowY: "auto" }}>{panels[tab]}</div>
-        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(16,14,26,0.9)", backdropFilter: "blur(12px)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
-          {visibleTabs.map(({ id, icon, label }) => (
-            <div key={id} onClick={() => setTab(id)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "11px 0 9px", cursor: "pointer", color: tab === id ? C.accent : C.muted, borderTop: `2px solid ${tab === id ? C.accent : "transparent"}`, transition: "all 0.2s" }}>
-              <span style={{ fontSize: "1.2rem" }}>{icon}</span>
-              <span style={{ fontSize: "0.62rem", marginTop: 4, fontWeight: 600 }}>{label}</span>
-            </div>
-          ))}
+
+        {/* ── Content ── */}
+        <div key={tab} className="fade-up" style={{
+          flex: 1,
+          padding: "14px 13px",
+          paddingBottom: "calc(70px + env(safe-area-inset-bottom, 16px))",
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+        }}>{panels[tab]}</div>
+
+        {/* ── Bottom tab bar — flush to bottom ── */}
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
+          background: "rgba(8,6,18,0.96)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderTop: `0.5px solid ${C.border}`,
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          display: "flex",
+        }}>
+          {visibleTabs.map(({ id, icon, label }) => {
+            const active = tab === id;
+            return (
+              <div key={id} onClick={() => setTab(id)} style={{
+                flex: 1, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center",
+                padding: "9px 0 8px",
+                cursor: "pointer",
+                position: "relative",
+                transition: "all 0.18s",
+              }}>
+                {/* Active indicator */}
+                {active && (
+                  <div style={{
+                    position: "absolute", top: 0, left: "20%", right: "20%",
+                    height: 2, borderRadius: "0 0 2px 2px",
+                    background: `linear-gradient(90deg, ${C.accent}, ${C.supra})`,
+                  }} />
+                )}
+                <span style={{
+                  fontSize: "1.1rem",
+                  filter: active ? "none" : "grayscale(0.4)",
+                  opacity: active ? 1 : 0.45,
+                  transition: "all 0.18s",
+                  transform: active ? "scale(1.08)" : "scale(1)",
+                  display: "block",
+                }}>{icon}</span>
+                <span style={{
+                  fontSize: "0.55rem",
+                  marginTop: 3,
+                  fontWeight: active ? 700 : 500,
+                  color: active ? C.accent : C.muted,
+                  letterSpacing: "0.02em",
+                  transition: "all 0.18s",
+                }}>{label}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
