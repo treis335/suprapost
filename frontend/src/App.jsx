@@ -897,13 +897,14 @@ export default function App() {
   const refreshAll = useCallback(async () => {
     if (!session) return;
     try {
-      const [s, w, a, p, st] = await Promise.all([
+      const [s, w, a, p, st, pr] = await Promise.all([
         api.get("/settings"), api.get("/wallet"), api.get("/automation"), api.get("/posts"), api.get("/stats"),
+        fetch("/api/pricing").then(r => r.json()).catch(() => ({ ok: false })),
       ]);
       if (s.unauthorized) { handleSignOut(); return; }
-      // Don't overwrite settings while user is actively typing
       if (!editingRef.current) setSettings(s);
       setWallet(w); setAutomation(a); setPosts(p); setStats(st);
+      if (pr?.ok) setPricing(pr.pricing);
     } catch {}
   }, [session]);
 
@@ -1223,7 +1224,7 @@ export default function App() {
   );
 
   const Generate = (
-    <ComposePage isMobile={isMobile} wallet={wallet} settings={settings} updateSetting={updateSetting}
+    <ComposePage isMobile={isMobile} wallet={wallet} pricing={pricing} settings={settings} updateSetting={updateSetting}
       saveSettings={saveSettings} channels={channels} generating={generating} handleGenerate={handleGenerate}
       tweet={tweet} setTweet={setTweet} scores={scores} genLog={genLog} onPost={onPost} />
   );

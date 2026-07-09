@@ -4,7 +4,7 @@ const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
-const { initDB } = require("./db");
+const { initDB, getPricing, DEFAULT_PRICING } = require("./db");
 const { runGenerationCycle } = require("./engine");
 const { startAutomation, stopAutomation, resumeAllAutomations } = require("./scheduler");
 const { publishToChannels } = require("./channels");
@@ -260,6 +260,25 @@ async function main() {
     if (!isAdminAddress(req.walletAddress)) return res.status(403).json({ ok: false, error: "Forbidden" });
     next();
   }
+
+  // ── PRICING — public read, admin write ──────────────────────────────────
+  app.get("/api/pricing", async (req, res) => {
+    await db.read();
+    res.json({ ok: true, pricing: getPricing(db) });
+  });
+
+  app.post("/api/admin/pricing", requireAuth, requireAdmin, async (req, res) => {
+    const { text, image, both } = req.body;
+    await db.read();
+    db.data.pricing = {
+      text:  Math.max(0.1, Number(text)  || DEFAULT_PRICING.text),
+      image: Math.max(0.1, Number(image) || DEFAULT_PRICING.image),
+      both:  Math.max(0.1, Number(both)  || DEFAULT_PRICING.both),
+    };
+    await db.write();
+    console.log("[admin] Pricing updated:", db.data.pricing);
+    res.json({ ok: true, pricing: db.data.pricing });
+  });
 
   app.get("/api/admin/withdrawals", requireAuth, requireAdmin, async (req, res) => {
     await db.read();

@@ -37,8 +37,8 @@ async function runGenerationCycle(db, address, opts = {}) {
   wallet.creditBalance = +(wallet.creditBalance - fromCredit).toFixed(8);
   remaining = +(remaining - fromCredit).toFixed(8);
   wallet.balance = +(wallet.balance - remaining).toFixed(8);
-  user.stats.supraEarned = +(user.stats.supraEarned + wallet.costPerPost).toFixed(2);
-  push(`⬡ Charged ${wallet.costPerPost} SUPRA — balance now ${wallet.balance} (+${wallet.creditBalance} credits)`);
+  user.stats.supraEarned = +(user.stats.supraEarned + modePrice).toFixed(2);
+  push(`⬡ Charged ${modePrice} SUPRA (${mode}) — balance now ${wallet.balance} (+${wallet.creditBalance} credits)`);
 
   // ── Text ──────────────────────────────────────────────────────────────────
   let text = null;

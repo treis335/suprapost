@@ -21,6 +21,9 @@ export function AdminPage({ walletAddress }) {
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState(null);
   const [error, setError] = useState(null);
+  const [pricing, setPricing] = useState({ text: 1, image: 2, both: 2.5 });
+  const [pricingSaved, setPricingSaved] = useState(false);
+  const [pricingSaving, setPricingSaving] = useState(false);
 
   function load() {
     setLoading(true);
@@ -28,11 +31,31 @@ export function AdminPage({ walletAddress }) {
       fetch("/api/admin/withdrawals", { headers: authHeaders() }).then(r => r.json()),
       fetch("/api/admin/withdrawals/history", { headers: authHeaders() }).then(r => r.json()),
       fetch("/api/admin/reconciliation", { headers: authHeaders() }).then(r => r.json()),
-    ]).then(([pending, hist, rec]) => {
+      fetch("/api/pricing").then(r => r.json()),
+    ]).then(([pending, hist, rec, price]) => {
       if (pending.ok) setItems(pending.withdrawals);
       if (hist.ok) setHistory(hist.withdrawals);
       if (rec.ok) setRecon(rec);
+      if (price.ok) setPricing(price.pricing);
     }).catch(() => {}).finally(() => setLoading(false));
+  }
+
+  async function savePricing() {
+    setPricingSaving(true);
+    try {
+      const res = await fetch("/api/admin/pricing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(pricing),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPricing(data.pricing);
+        setPricingSaved(true);
+        setTimeout(() => setPricingSaved(false), 2500);
+      }
+    } catch {}
+    setPricingSaving(false);
   }
 
   useEffect(() => { load(); }, []);

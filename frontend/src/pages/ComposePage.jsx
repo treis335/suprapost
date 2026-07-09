@@ -27,6 +27,7 @@ export function ComposePage({
   wallet,
   settings,
   updateSetting,
+  pricing = { text: 1, image: 2, both: 2.5 },
   saveSettings,
   channels,
   generating,
@@ -207,7 +208,7 @@ export function ComposePage({
                   />
                 </Field>
                 <Btn full variant="primary" onClick={onGenerate} disabled={generating}>
-                  {generating ? "Generating…" : `✦ Generate — ${fmt(wallet.costPerPost)} SUPRA`}
+                  {generating ? "Generating…" : `✦ Generate — ${fmt(pricing[mode] ?? wallet.costPerPost)} SUPRA`}
                 </Btn>
                 {tweet && (
                   <div style={{ fontSize: "0.7rem", color: C.supra, marginTop: 2 }}>
