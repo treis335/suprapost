@@ -875,6 +875,7 @@ export default function App() {
   const [showLanding, setShowLanding] = useState(() => !getSession());
 
   const [settings, setSettings] = useState({ niche: "", tone: "technical", audience: "", examples: "", avoid: "", postType: "alpha", customPrompt: "" });
+  const editingRef = useRef(false); // true while user is typing in any field
   const [channels, setChannels] = useState([]);
   const [wallet, setWallet] = useState({ balance: 0, costPerPost: 1 });
   const [automation, setAutomation] = useState({ running: false, cycleSeconds: 21600, autoApprove: true, nextRunAt: null });
@@ -900,7 +901,9 @@ export default function App() {
         api.get("/settings"), api.get("/wallet"), api.get("/automation"), api.get("/posts"), api.get("/stats"),
       ]);
       if (s.unauthorized) { handleSignOut(); return; }
-      setSettings(s); setWallet(w); setAutomation(a); setPosts(p); setStats(st);
+      // Don't overwrite settings while user is actively typing
+      if (!editingRef.current) setSettings(s);
+      setWallet(w); setAutomation(a); setPosts(p); setStats(st);
     } catch {}
   }, [session]);
 
@@ -930,10 +933,14 @@ export default function App() {
     return () => clearInterval(timerRef.current);
   }, [automation]);
 
-  function updateSetting(key, value) { setSettings(s => ({ ...s, [key]: value })); }
+  function updateSetting(key, value) {
+    editingRef.current = true;
+    setSettings(s => ({ ...s, [key]: value }));
+  }
 
   async function saveSettings() {
     const updated = await api.post("/settings", settings);
+    editingRef.current = false;
     setSettings(updated);
     showToast("Profile saved ✓");
   }
