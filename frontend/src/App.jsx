@@ -878,6 +878,7 @@ export default function App() {
   const editingRef = useRef(false); // true while user is typing in any field
   const [channels, setChannels] = useState([]);
   const [wallet, setWallet] = useState({ balance: 0, costPerPost: 1 });
+  const [pricing, setPricing] = useState({ text: 1, image: 2, both: 2.5 });
   const [automation, setAutomation] = useState({ running: false, cycleSeconds: 21600, autoApprove: true, nextRunAt: null });
   const [stats, setStats] = useState({ totalGenerations: 0, totalPosts: 0, supraEarned: 0 });
   const [posts, setPosts] = useState([]);
