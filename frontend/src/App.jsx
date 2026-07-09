@@ -73,48 +73,51 @@ function useViewport() {
 const GlobalStyle = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-    * { box-sizing: border-box; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      background: #080b12;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 3px; height: 3px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: ${C.borderLight}; border-radius: 4px; }
-    @keyframes softPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
-    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes scaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
-    @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 10px; }
 
-    /* ── Mobile optimisations ── */
+    /* Reset */
+    input, select, textarea, button { font-family: inherit; }
+    input::placeholder, textarea::placeholder { color: ${C.muted}; opacity: 1; }
+    input:focus, textarea:focus, select:focus { outline: none; }
+    button { -webkit-tap-highlight-color: transparent; cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+
+    /* Animations */
+    @keyframes softPulse { 0%,100% { opacity:1; transform:scale(1) }   50% { opacity:.5; transform:scale(.88) } }
+    @keyframes fadeUp    { from { opacity:0; transform:translateY(6px) }  to { opacity:1; transform:translateY(0) } }
+    @keyframes fadeIn    { from { opacity:0 }                             to { opacity:1 } }
+    @keyframes scaleIn   { from { opacity:0; transform:scale(0.97) }      to { opacity:1; transform:scale(1) } }
+    @keyframes toastIn   { from { opacity:0; transform:translateY(8px) }  to { opacity:1; transform:translateY(0) } }
+
+    .fade-up  { animation: fadeUp  0.22s cubic-bezier(.16,.84,.44,1) both }
+    .scale-in { animation: scaleIn 0.18s cubic-bezier(.16,.84,.44,1) both }
+    .fade-in  { animation: fadeIn  0.18s ease both }
+
+    /* Mobile */
     @media (max-width: 699px) {
-      /* Tighter cards */
-      .card-mobile { padding: 12px 13px !important; border-radius: 11px !important; }
-
-      /* Smaller base font */
       body { font-size: 13px; }
-
-      /* Inputs more compact */
-      input, select, textarea {
-        font-size: 0.82rem !important;
-        padding: 8px 11px !important;
-      }
-
-      /* Buttons */
-      button { font-size: 0.8rem !important; }
-
-      /* Labels and hints */
-      .field-label { font-size: 0.68rem !important; }
-
-      /* Prevent iOS zoom on input focus */
       input[type="text"], input[type="number"], input[type="password"],
-      input[type="email"], select, textarea {
+      input[type="email"], input[type="search"], select, textarea {
         font-size: 16px !important;
-        -webkit-text-size-adjust: 100%;
       }
     }
-    .fade-up { animation: fadeUp 0.4s cubic-bezier(.2,.8,.2,1) both; }
-    .scale-in { animation: scaleIn 0.3s cubic-bezier(.2,.8,.2,1) both; }
-    input::placeholder, textarea::placeholder { color: ${C.muted}; }
-    input:focus, textarea:focus, select:focus { outline: none; }
-    @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+    }
   `}</style>
 );
 
@@ -634,33 +637,71 @@ function LoginScreen({ onSignedIn, isMobile }) {
   }
 
   return (
-    <div style={{ minHeight: "100dvh", background: C.bgGrad, color: C.text, fontFamily: C.sans, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+    <div style={{
+      minHeight: "100dvh", background: C.bgGrad, color: C.text,
+      fontFamily: C.sans, display: "flex", alignItems: "center",
+      justifyContent: "center", padding: "24px 20px",
+    }}>
       <GlobalStyle />
-      <div style={{ width: "100%", maxWidth: 420, textAlign: "center" }} className="fade-up">
-        <div style={{ width: 64, height: 64, borderRadius: 18, background: `linear-gradient(135deg, ${C.accent}22, ${C.accentDeep}22)`, border: `1.5px solid ${C.accent}44`, margin: "0 auto 24px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", boxShadow: `0 8px 24px -8px ${C.accent}88` }}>⬡</div>
-        <div style={{ fontSize: "2rem", fontWeight: 700, fontFamily: C.display, letterSpacing: "-0.02em", marginBottom: 8 }}>
-          Supra<span style={{ color: C.accent }}>Post</span>
-        </div>
-        <div style={{ fontSize: "0.85rem", color: C.muted, marginBottom: 32 }}>AI Social Automation</div>
+      <div style={{ width: "100%", maxWidth: 380 }} className="fade-up">
 
-        <Card>
-          <div style={{ fontSize: "1.05rem", fontWeight: 600, fontFamily: C.display, marginBottom: 8 }}>Sign in with your Supra wallet</div>
-          <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6, marginBottom: 26 }}>
-            No password, no email. Connect your StarKey wallet and start automating your posts in seconds.
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: 15,
+            background: `${C.accent}14`,
+            border: `0.5px solid ${C.accent}33`,
+            margin: "0 auto 20px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "1.5rem",
+          }}>⬡</div>
+          <div style={{ fontSize: "1.75rem", fontWeight: 700, fontFamily: C.display, letterSpacing: "-0.03em" }}>
+            Supra<span style={{ color: C.accent }}>Post</span>
           </div>
+          <div style={{ fontSize: "0.78rem", color: C.muted, marginTop: 6, letterSpacing: "0.04em" }}>
+            AI Social Automation
+          </div>
+        </div>
+
+        {/* Card */}
+        <Card>
+          <div style={{ fontSize: "0.95rem", fontWeight: 600, marginBottom: 6, color: C.text }}>
+            Sign in with StarKey
+          </div>
+          <div style={{ fontSize: "0.78rem", color: C.text2, lineHeight: 1.65, marginBottom: 22 }}>
+            No password, no email — your wallet is your account.
+          </div>
+
           {installed === false && (
-            <div style={{ fontSize: "0.78rem", color: C.warn, background: `${C.warn}14`, border: `1px solid ${C.warn}33`, borderRadius: 10, padding: 12, marginBottom: 16, lineHeight: 1.6 }}>
-              StarKey wallet not detected. Install the extension from{" "}
-              <a href="https://starkey.app" target="_blank" rel="noreferrer" style={{ color: C.warn }}>starkey.app</a> and reload.
+            <div style={{
+              fontSize: "0.74rem", color: C.warn,
+              background: `${C.warn}0e`, border: `0.5px solid ${C.warn}30`,
+              borderRadius: 8, padding: "10px 13px", marginBottom: 14, lineHeight: 1.6,
+            }}>
+              StarKey not detected —{" "}
+              <a href="https://starkey.app" target="_blank" rel="noreferrer"
+                style={{ color: C.warn, textDecoration: "underline" }}>
+                install here
+              </a>
             </div>
           )}
+
           {error && (
-            <div style={{ fontSize: "0.78rem", color: C.danger, background: `${C.danger}14`, border: `1px solid ${C.danger}33`, borderRadius: 10, padding: 12, marginBottom: 16 }}>{error}</div>
+            <div style={{
+              fontSize: "0.74rem", color: C.danger,
+              background: `${C.danger}0e`, border: `0.5px solid ${C.danger}30`,
+              borderRadius: 8, padding: "10px 13px", marginBottom: 14,
+            }}>{error}</div>
           )}
+
           <Btn variant="primary" full size="lg" onClick={handleSignIn} disabled={signing || installed === false}>
             {signing ? "Signing in…" : "Connect wallet"}
           </Btn>
         </Card>
+
+        <div style={{ textAlign: "center", marginTop: 20, fontSize: "0.68rem", color: C.muted }}>
+          Powered by Supra blockchain
+        </div>
       </div>
     </div>
   );
