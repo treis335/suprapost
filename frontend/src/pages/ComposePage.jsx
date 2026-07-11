@@ -156,6 +156,7 @@ export function ComposePage({
               >
                 <span style={{ fontSize: "1.4rem" }}>{icon}</span>
                 <span style={{ fontSize: "0.74rem", fontWeight: 600 }}>{label}</span>
+                <span style={{ fontSize: "0.66rem", color: C.muted }}>{fmt(pricing[id])} SUPRA</span>
               </button>
             ))}
           </div>

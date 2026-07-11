@@ -1109,7 +1109,7 @@ export default function App() {
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 13 }}>
         <StatTile label="Auto Posts" value={posts.filter(p => p.auto).length} color={C.supra} />
-        <StatTile label="SUPRA / Cycle" value={fmt(wallet.costPerPost)} color={C.accent} />
+        <StatTile label="SUPRA / Cycle" value={fmt(pricing[automation.mode || "text"] ?? wallet.costPerPost)} color={C.accent} />
         <StatTile label="Total Spent" value={fmt(stats.supraEarned)} color={C.warn} />
         <StatTile label="Generated" value={stats.totalGenerations} color={C.accent2} />
       </div>
@@ -1138,11 +1138,11 @@ export default function App() {
             </div>
             <input type="checkbox" checked={automation.autoApprove} onChange={e => saveAutomationSettings({ autoApprove: e.target.checked })} style={{ width: 22, height: 22, accentColor: C.accent, cursor: "pointer" }} />
           </div>
-          <Field label="Content mode" hint="What each automated cycle will post">
+          <Field label="Content mode" hint={`What each automated cycle will post — ${fmt(pricing[automation.mode || "text"] ?? wallet.costPerPost)} SUPRA per cycle`}>
             <Select value={automation.mode || "text"} onChange={e => saveAutomationSettings({ mode: e.target.value })} disabled={automation.running}>
-              <option value="text">📝 Text Only (AI generated)</option>
-              <option value="image">🖼 Image Only (AI generated)</option>
-              <option value="both">✦ Text + Image (both AI generated)</option>
+              <option value="text">📝 Text Only — {fmt(pricing.text)} SUPRA</option>
+              <option value="image">🖼 Image Only — {fmt(pricing.image)} SUPRA</option>
+              <option value="both">✦ Text + Image — {fmt(pricing.both)} SUPRA</option>
             </Select>
           </Field>
           {(automation.mode === "image" || automation.mode === "both") && (
