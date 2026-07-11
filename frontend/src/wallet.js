@@ -51,7 +51,12 @@ export async function signInWithWallet() {
   const p = getProvider();
   if (!p) throw new Error("StarKey not detected — install it from starkey.app");
 
-  // Step 1: connect and get the address
+  // Step 1: disconnect first to force StarKey to show account selector,
+  // then reconnect so the user can choose which wallet to use.
+  try {
+    if (typeof p.disconnect === "function") await p.disconnect().catch(() => {});
+  } catch (_) {}
+
   let accounts;
   try {
     accounts = await p.connect();
