@@ -67,9 +67,21 @@ function freshUserData() {
   };
 }
 
+const DEFAULT_PRICING = { text: 1, image: 2, both: 2.5 };
+
 const defaultData = {
   users: {}, // keyed by lowercase wallet address
+  pricing: { ...DEFAULT_PRICING },
 };
+
+/**
+ * Returns the current per-mode pricing, creating sane defaults on first
+ * access if this db.json predates the pricing feature.
+ */
+function getPricing(db) {
+  if (!db.data.pricing) db.data.pricing = { ...DEFAULT_PRICING };
+  return db.data.pricing;
+}
 
 /**
  * Minimal lowdb-compatible wrapper around a plain JSON file.
@@ -253,4 +265,18 @@ async function initDB() {
   return db;
 }
 
-module.exports = { db, initDB, freshUserData };
+module.exports = { db, initDB, freshUserData, getPricing, DEFAULT_PRICING };
+
+// ── Migration: ensure pricing exists (db.json predating this feature) ───
+(async () => {
+  try {
+    await db.read();
+    if (!db.data.pricing) {
+      db.data.pricing = { ...DEFAULT_PRICING };
+      await db.write();
+      console.log("[db] Backfilled default pricing:", db.data.pricing);
+    }
+  } catch (err) {
+    console.error("[db] Pricing migration failed:", err.message);
+  }
+})();

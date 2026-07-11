@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require("uuid");
 const { generatePost, scorePost } = require("./deepseek");
 const { generateImage } = require("./imageGen");
 const { publishToChannels } = require("./channels");
+const { getPricing } = require("./db");
 const path = require("path");
 const { IMAGES_DIR } = require("./imageGen");
 
@@ -25,20 +26,22 @@ async function runGenerationCycle(db, address, opts = {}) {
   const { wallet, settings, channels } = user;
 
   wallet.creditBalance = wallet.creditBalance || 0;
+  const pricing = getPricing(db);
+  const modePrice = pricing[mode] ?? pricing.text ?? wallet.costPerPost ?? 1;
   const totalFunds = +(wallet.balance + wallet.creditBalance).toFixed(8);
-  if (totalFunds < wallet.costPerPost) {
+  if (totalFunds < modePrice) {
     push("✕ Insufficient SUPRA balance — cycle aborted");
     return { ok: false, reason: "insufficient_balance", log };
   }
 
-  // Spend referral credits first, then the deposited balance
-  let remaining = wallet.costPerPost;
-  const fromCredit = Math.min(wallet.creditBalance, remaining);
-  wallet.creditBalance = +(wallet.creditBalance - fromCredit).toFixed(8);
-  remaining = +(remaining - fromCredit).toFixed(8);
-  wallet.balance = +(wallet.balance - remaining).toFixed(8);
-  user.stats.supraEarned = +(user.stats.supraEarned + modePrice).toFixed(2);
-  push(`⬡ Charged ${modePrice} SUPRA (${mode}) — balance now ${wallet.balance} (+${wallet.creditBalance} credits)`);
+  function charge(amount) {
+    let rem = amount;
+    const fromCredit = Math.min(wallet.creditBalance, rem);
+    wallet.creditBalance = +(wallet.creditBalance - fromCredit).toFixed(8);
+    rem = +(rem - fromCredit).toFixed(8);
+    wallet.balance = +(wallet.balance - rem).toFixed(8);
+    user.stats.supraEarned = +(user.stats.supraEarned + amount).toFixed(2);
+  }
 
   // ── Text ──────────────────────────────────────────────────────────────────
   let text = null;
@@ -52,6 +55,7 @@ async function runGenerationCycle(db, address, opts = {}) {
   let imagePath     = null;
   let imageFilename = null;
   let imagePrompt   = null;
+  let imageFailed   = false;
 
   if (mode === "image" || mode === "both") {
     push(`🖼 Generating image (style: ${imageStyle})...`);
@@ -67,11 +71,29 @@ async function runGenerationCycle(db, address, opts = {}) {
       imagePrompt   = result.prompt;
       push(`✓ Image ready → ${imageFilename}`);
     } else if (result.simulated) {
+      imageFailed = true;
       push("⚠ Image skipped — TOGETHER_API_KEY not set");
     } else {
+      imageFailed = true;
       push(`⚠ Image generation failed: ${result.error}`);
     }
   }
+
+  // Charge only for what was actually delivered. If the image failed on an
+  // "image"-only cycle, fall back to text so the user gets something for
+  // their SUPRA instead of paying full price for nothing; on "both", fall
+  // back to the cheaper text-only price since only the text was delivered.
+  let actualMode = mode;
+  if (imageFailed && mode === "image") {
+    push("🤖 Falling back to text since the image failed...");
+    text = text || await generatePost(settings);
+    actualMode = "text";
+  } else if (imageFailed && mode === "both") {
+    actualMode = "text";
+  }
+  const actualPrice = pricing[actualMode] ?? modePrice;
+  charge(actualPrice);
+  push(`⬡ Charged ${actualPrice} SUPRA (${actualMode}) — balance now ${wallet.balance} (+${wallet.creditBalance} credits)`);
 
   const { scores, avg } = scorePost();
   push(`🧠 Self-critique: ${avg}/10`);
@@ -79,7 +101,7 @@ async function runGenerationCycle(db, address, opts = {}) {
 
   const post = {
     id:       uuidv4(),
-    mode,
+    mode:     actualMode,
     text,
     imageUrl: imageFilename ? `/images/${imageFilename}` : null,
     avgScore: avg,

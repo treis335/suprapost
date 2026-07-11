@@ -98,6 +98,36 @@ export function AdminPage({ walletAddress }) {
         <div style={{ fontSize: "0.85rem", color: C.muted, marginTop: 4 }}>Pending referral-credit withdrawals. Pay sends SUPRA from this wallet via StarKey.</div>
       </div>
 
+      {/* Post pricing */}
+      <Card style={{ padding: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+          <div style={{ fontSize: "0.72rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Post Pricing</div>
+          {pricingSaved && <div style={{ fontSize: "0.76rem", color: C.supra }}>✓ Saved</div>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+          {[
+            { key: "text", label: "📝 Text only" },
+            { key: "image", label: "🖼 Image only" },
+            { key: "both", label: "✦ Text + Image" },
+          ].map(f => (
+            <div key={f.key}>
+              <div style={{ fontSize: "0.74rem", color: C.text2, marginBottom: 6 }}>{f.label}</div>
+              <input
+                type="number" min="0.1" step="0.1" value={pricing[f.key]}
+                onChange={e => setPricing(p => ({ ...p, [f.key]: Number(e.target.value) }))}
+                style={{
+                  width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 11,
+                  color: C.text, fontFamily: C.mono, fontSize: "0.9rem", padding: "10px 12px", outline: "none", boxSizing: "border-box",
+                }}
+              />
+            </div>
+          ))}
+        </div>
+        <Btn variant="primary" size="sm" style={{ marginTop: 14 }} onClick={savePricing} disabled={pricingSaving}>
+          {pricingSaving ? "Saving…" : "Save pricing"}
+        </Btn>
+      </Card>
+
       {recon && (
         <Card style={{ padding: 18 }}>
           <div style={{ fontSize: "0.72rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Reconciliation</div>
