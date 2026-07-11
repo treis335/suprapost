@@ -9,6 +9,7 @@ import { LandingPage } from "./pages/LandingPage";
 import { depositSupra } from "./payment";
 
 // === CONFIGURAÇÃO API (FIX PARA VERCEL + TUNNEL) ===
+const apiBase = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
 const TABS = [
   { id: "setup",      icon: "⚙",  label: "Setup" },
