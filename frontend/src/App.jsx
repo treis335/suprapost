@@ -9,7 +9,6 @@ import { LandingPage } from "./pages/LandingPage";
 import { depositSupra } from "./payment";
 
 // === CONFIGURAÇÃO API (FIX PARA VERCEL + TUNNEL) ===
-const apiBase = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
 const TABS = [
   { id: "setup",      icon: "⚙",  label: "Setup" },
@@ -520,7 +519,7 @@ function DepositHistory() {
   async function load() {
     try {
       const session = getSession();
-      const res = await fetch("/api/wallet/deposits", {
+      const res = await apiFetch("/api/wallet/deposits", {
         headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {},
       });
       const data = await res.json();
@@ -578,7 +577,7 @@ function DepositHistoryFull() {
 
   useEffect(() => {
     const session = getSession();
-    fetch("/api/wallet/deposits", { headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {} })
+    apiFetch("/api/wallet/deposits", { headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {} })
       .then(r => r.json())
       .then(d => setDeposits(d.ok ? d.deposits : []))
       .catch(() => setDeposits([]));
@@ -715,7 +714,7 @@ function ReferralCard({ walletAddress }) {
 
   useEffect(() => {
     if (!walletAddress) return;
-    fetch("/api/referral", { headers: authHeaders() })
+    apiFetch("/api/referral", { headers: authHeaders() })
       .then(r => r.json())
       .then(d => { if (d.ok) setStats(d); })
       .catch(() => {});
@@ -900,7 +899,7 @@ export default function App() {
     try {
       const [s, w, a, p, st, pr] = await Promise.all([
         api.get("/settings"), api.get("/wallet"), api.get("/automation"), api.get("/posts"), api.get("/stats"),
-        fetch("/api/pricing").then(r => r.json()).catch(() => ({ ok: false })),
+        apiFetch("/api/pricing").then(r => r.json()).catch(() => ({ ok: false })),
       ]);
       if (s.unauthorized) { handleSignOut(); return; }
       if (!editingRef.current) setSettings(s);

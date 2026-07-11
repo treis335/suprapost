@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { C, fmt } from "../theme";
+import { apiFetch, authHeaders } from "../lib/apiFetch";
 import { Card, Btn, Pill } from "../components/ui";
 import { depositSupra } from "../payment";
 import { getSession } from "../wallet";
@@ -12,7 +13,7 @@ function DepositHistory() {
   async function load() {
     try {
       const session = getSession();
-      const res = await fetch("/api/wallet/deposits", {
+      const res = await apiFetch("/api/wallet/deposits", {
         headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {},
       });
       const data = await res.json();

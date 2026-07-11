@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { C } from "../../theme";
+import { apiFetch, authHeaders } from "../../lib/apiFetch";
 import { Btn } from "./Btn";
 import { Select } from "./Inputs";
 import { Field, Input } from "./Inputs";
@@ -40,7 +41,7 @@ export function ImagePanel({ postText, onChange, compact = false, forceOpen = fa
     setError(null);
     setPreview(null);
     try {
-      const res = await fetch("/api/image/generate", {
+      const res = await apiFetch("/api/image/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postText, style, customPrompt: customPrompt || undefined }),
@@ -69,7 +70,7 @@ export function ImagePanel({ postText, onChange, compact = false, forceOpen = fa
     reader.onload = async (e) => {
       const b64 = e.target.result;
       try {
-        const res = await fetch("/api/image/upload", {
+        const res = await apiFetch("/api/image/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ data: b64, mimeType: file.type }),

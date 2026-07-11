@@ -1,18 +1,12 @@
 import { useState, useEffect } from "react";
 import { C } from "../theme";
+import { apiFetch, authHeaders } from "../lib/apiFetch";
 import { Btn } from "../components/ui/Btn";
 import { Card } from "../components/ui/Card";
 import { sendSupraTransfer } from "../payment";
 
 const fmt = (n) => Number(n ?? 0).toFixed(2);
 
-function authHeaders() {
-  try {
-    const raw = sessionStorage.getItem("suprapost_session");
-    const s = raw ? JSON.parse(raw) : null;
-    return s?.token ? { Authorization: `Bearer ${s.token}` } : {};
-  } catch { return {}; }
-}
 
 export function AdminPage({ walletAddress }) {
   const [items, setItems] = useState([]);
@@ -28,10 +22,10 @@ export function AdminPage({ walletAddress }) {
   function load() {
     setLoading(true);
     Promise.all([
-      fetch("/api/admin/withdrawals", { headers: authHeaders() }).then(r => r.json()),
-      fetch("/api/admin/withdrawals/history", { headers: authHeaders() }).then(r => r.json()),
-      fetch("/api/admin/reconciliation", { headers: authHeaders() }).then(r => r.json()),
-      fetch("/api/pricing").then(r => r.json()),
+      apiFetch("/api/admin/withdrawals", { headers: authHeaders() }).then(r => r.json()),
+      apiFetch("/api/admin/withdrawals/history", { headers: authHeaders() }).then(r => r.json()),
+      apiFetch("/api/admin/reconciliation", { headers: authHeaders() }).then(r => r.json()),
+      apiFetch("/api/pricing").then(r => r.json()),
     ]).then(([pending, hist, rec, price]) => {
       if (pending.ok) setItems(pending.withdrawals);
       if (hist.ok) setHistory(hist.withdrawals);
@@ -43,7 +37,7 @@ export function AdminPage({ walletAddress }) {
   async function savePricing() {
     setPricingSaving(true);
     try {
-      const res = await fetch("/api/admin/pricing", {
+      const res = await apiFetch("/api/admin/pricing", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(pricing),
@@ -67,7 +61,7 @@ export function AdminPage({ walletAddress }) {
       const txHash = await sendSupraTransfer(walletAddress, w.toAddress, w.amount);
       if (!txHash || typeof txHash !== "string") throw new Error("No transaction hash returned by StarKey.");
 
-      const res = await fetch(`/api/admin/withdrawals/${w.address}/${w.id}`, {
+      const res = await apiFetch(`/api/admin/withdrawals/${w.address}/${w.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ status: "paid", txHash }),
@@ -84,7 +78,7 @@ export function AdminPage({ walletAddress }) {
   async function reject(w) {
     setError(null);
     try {
-      const res = await fetch(`/api/admin/withdrawals/${w.address}/${w.id}`, {
+      const res = await apiFetch(`/api/admin/withdrawals/${w.address}/${w.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ status: "rejected" }),

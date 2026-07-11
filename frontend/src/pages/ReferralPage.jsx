@@ -1,15 +1,9 @@
 import { useState, useEffect } from "react";
 import { C } from "../theme";
+import { apiFetch, authHeaders } from "../lib/apiFetch";
 
 const fmt = (n) => Number(n ?? 0).toFixed(2);
 
-function authHeaders() {
-  try {
-    const raw = sessionStorage.getItem("suprapost_session");
-    const s = raw ? JSON.parse(raw) : null;
-    return s?.token ? { Authorization: `Bearer ${s.token}` } : {};
-  } catch { return {}; }
-}
 
 export function ReferralPage({ walletAddress, isMobile }) {
   const [stats, setStats]   = useState(null);
@@ -25,13 +19,13 @@ export function ReferralPage({ walletAddress, isMobile }) {
     : "";
 
   function loadWallet() {
-    fetch("/api/wallet", { headers: authHeaders() }).then(r => r.json()).then(w => setCreditBalance(w.creditBalance || 0)).catch(() => {});
-    fetch("/api/wallet/withdrawals", { headers: authHeaders() }).then(r => r.json()).then(d => { if (d.ok) setWithdrawals(d.withdrawals); }).catch(() => {});
+    apiFetch("/api/wallet", { headers: authHeaders() }).then(r => r.json()).then(w => setCreditBalance(w.creditBalance || 0)).catch(() => {});
+    apiFetch("/api/wallet/withdrawals", { headers: authHeaders() }).then(r => r.json()).then(d => { if (d.ok) setWithdrawals(d.withdrawals); }).catch(() => {});
   }
 
   useEffect(() => {
     if (!walletAddress) return;
-    fetch("/api/referral", { headers: authHeaders() })
+    apiFetch("/api/referral", { headers: authHeaders() })
       .then(r => r.json())
       .then(d => { if (d.ok) setStats(d); })
       .catch(() => {});
@@ -42,7 +36,7 @@ export function ReferralPage({ walletAddress, isMobile }) {
     setMsg(null);
     setWithdrawing(true);
     try {
-      const res = await fetch("/api/wallet/withdraw", {
+      const res = await apiFetch("/api/wallet/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ amount: Number(amount) }),
