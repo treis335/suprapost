@@ -79,21 +79,15 @@ async function runGenerationCycle(db, address, opts = {}) {
     }
   }
 
-  // Charge only for what was actually delivered. If the image failed on an
-  // "image"-only cycle, fall back to text so the user gets something for
-  // their SUPRA instead of paying full price for nothing; on "both", fall
-  // back to the cheaper text-only price since only the text was delivered.
-  let actualMode = mode;
-  if (imageFailed && mode === "image") {
-    push("🤖 Falling back to text since the image failed...");
-    text = text || await generatePost(settings);
-    actualMode = "text";
-  } else if (imageFailed && mode === "both") {
-    actualMode = "text";
+  // All-or-nothing policy: if image was required but failed, abort without charging.
+  // The user paid for a specific mode — if we can't deliver it, they get nothing charged.
+  if (imageFailed && (mode === "image" || mode === "both")) {
+    push(`✕ Image generation failed — cycle aborted, nothing charged`);
+    return { ok: false, reason: "generation_failed", detail: "Image generation failed", log };
   }
-  const actualPrice = pricing[actualMode] ?? modePrice;
-  charge(actualPrice);
-  push(`⬡ Charged ${actualPrice} SUPRA (${actualMode}) — balance now ${wallet.balance} (+${wallet.creditBalance} credits)`);
+
+  charge(modePrice);
+  push(`⬡ Charged ${modePrice} SUPRA (${mode}) — balance now ${wallet.balance} (+${wallet.creditBalance} credits)`);
 
   const { scores, avg } = scorePost();
   push(`🧠 Self-critique: ${avg}/10`);
@@ -101,7 +95,7 @@ async function runGenerationCycle(db, address, opts = {}) {
 
   const post = {
     id:       uuidv4(),
-    mode:     actualMode,
+    mode:     mode,
     text,
     imageUrl: imageFilename ? `/images/${imageFilename}` : null,
     avgScore: avg,

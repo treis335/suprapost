@@ -23,12 +23,20 @@ async function scheduleNext(db, address) {
     if (!u.automation.running) return;
 
     const { autoApprove, mode, imageStyle, imageCustomPrompt } = u.automation;
-    await runGenerationCycle(db, address, {
+    const result = await runGenerationCycle(db, address, {
       autoPost: autoApprove,
       mode:              mode              || "text",
       imageStyle:        imageStyle        || "auto",
       imageCustomPrompt: imageCustomPrompt || "",
     });
+
+    // Stop automation if generation failed (e.g. image API out of credits)
+    // or if balance is insufficient — no point retrying endlessly
+    if (!result.ok && (result.reason === "generation_failed" || result.reason === "insufficient_balance")) {
+      console.log(`[scheduler] Stopping automation for ${address} — reason: ${result.reason}`);
+      await stopAutomation(db, address, { persist: true });
+      return;
+    }
 
     await db.read();
     if (db.forUser(address).automation.running) await scheduleNext(db, address);
