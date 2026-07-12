@@ -6,7 +6,31 @@ const { getPricing } = require("./db");
 const path = require("path");
 const { IMAGES_DIR } = require("./imageGen");
 
+// ── Per-user lock ────────────────────────────────────────────────────────────
+// If two cycles for the same user overlap (e.g. a stray duplicate automation
+// timer, or automation firing while a manual "Generate" is in flight), each
+// one reads the wallet balance independently and the slower write silently
+// clobbers the faster one — the user gets charged once instead of twice even
+// though two posts went out. This serialises all cycles per address so a
+// charge is always applied to the *result* of the previous one, never to a
+// stale snapshot.
+const userLocks = new Map(); // address (lowercase) -> promise chain tail
+
 async function runGenerationCycle(db, address, opts = {}) {
+  const key = (address || "").toLowerCase();
+  const prevTail = userLocks.get(key) || Promise.resolve();
+  const runPromise = prevTail
+    .catch(() => {}) // don't let a previous failure block the queue
+    .then(() => runGenerationCycleLocked(db, address, opts));
+  userLocks.set(key, runPromise);
+  try {
+    return await runPromise;
+  } finally {
+    if (userLocks.get(key) === runPromise) userLocks.delete(key);
+  }
+}
+
+async function runGenerationCycleLocked(db, address, opts = {}) {
   const {
     autoPost     = false,
     mode         = "text",   // "text" | "image" | "both"
