@@ -972,8 +972,10 @@ export default function App() {
         setTweet(data.post.text);
         if (data.post.scores) setScores(data.post.scores);
         if (data.log) setGenLog(data.log);
-        setWallet(w => ({ ...w, balance: Math.max(0, w.balance - (w.costPerPost || 1)) }));
         setStats(s => ({ ...s, totalGenerations: (s.totalGenerations || 0) + 1 }));
+        // Don't guess the charge locally (it depends on the mode's real
+        // price, not the old flat costPerPost) — just fetch the real balance.
+        api.get("/wallet").then(w => { if (!w.unauthorized) setWallet(w); }).catch(() => {});
       } else if (data.log) setGenLog(data.log);
     } catch (err) { setGenLog([{ time: new Date().toISOString(), msg: `✕ Error: ${err.message}` }]); }
     setGenerating(false);
