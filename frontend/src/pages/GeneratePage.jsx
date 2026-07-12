@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { C, fmt } from "../theme";
+import { resolveImageUrl } from "../lib/apiFetch";
 import { Btn, Card, Field, Input, Log, ScoreBar, Select, TextArea, TweetPreview, ChannelResultsRow, ImagePanel } from "../components/ui";
 
 export function GeneratePage({
@@ -100,7 +101,7 @@ export function GeneratePage({
               {/* Image thumbnail above text preview if image ready */}
               {hasImage && (
                 <div style={{ marginBottom: 12, borderRadius: 10, overflow: "hidden", maxHeight: 200 }}>
-                  <img src={imageState.imageUrl} alt="Preview" style={{ width: "100%", objectFit: "cover", display: "block" }} />
+                  <img src={resolveImageUrl(imageState.imageUrl)} alt="Preview" style={{ width: "100%", objectFit: "cover", display: "block" }} />
                 </div>
               )}
 

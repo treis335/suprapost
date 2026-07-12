@@ -27,7 +27,7 @@ export function RightPanel({ stats, settings, posts }) {
           <div style={{ height: 1, background: C.border, margin: "5px 0" }} />
           <div style={{ fontSize: "0.64rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.15em" }}>Latest Post</div>
           <Card style={{ fontSize: "0.76rem", color: C.text2, lineHeight: 1.6 }}>
-            {posts[0].text.substring(0, 110)}{posts[0].text.length > 110 ? "..." : ""}
+            {posts[0].text ? `${posts[0].text.substring(0, 110)}${posts[0].text.length > 110 ? "..." : ""}` : "🖼 Image post"}
           </Card>
         </>
       )}

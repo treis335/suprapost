@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { C, fmt } from "../theme";
+import { resolveImageUrl } from "../lib/apiFetch";
 import {
   Btn, Card, Field, Input, Log, ScoreBar, Select,
   TextArea, TweetPreview, ChannelPreview, ChannelResultsRow, ImagePanel, Switch, Pill,
@@ -326,7 +327,7 @@ export function ComposePage({
           {/* Image preview */}
           {(mode === "image" || mode === "both") && hasImage && (
             <div style={{ borderRadius: 10, overflow: "hidden", marginBottom: mode === "both" ? 12 : 0, maxHeight: 240 }}>
-              <img src={imageState.imageUrl} alt="Preview" style={{ width: "100%", objectFit: "cover", display: "block" }} />
+              <img src={resolveImageUrl(imageState.imageUrl)} alt="Preview" style={{ width: "100%", objectFit: "cover", display: "block" }} />
             </div>
           )}
 

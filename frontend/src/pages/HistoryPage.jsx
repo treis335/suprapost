@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { C } from "../theme";
+import { resolveImageUrl } from "../lib/apiFetch";
 import { Btn, Card, StatTile } from "../components/ui";
 import { ChannelResultsRow } from "../components/ui";
 
@@ -55,7 +56,7 @@ export function HistoryPage({ isMobile, posts, stats, clearHistory }) {
                   <div style={{ flexShrink: 0, width: 8, height: 8, borderRadius: "50%", background: post.posted ? C.supra : C.muted, boxShadow: post.posted ? `0 0 6px ${C.supra}` : "none", marginTop: 5 }} />
                   {post.imageUrl && (
                     <div style={{ flexShrink: 0, width: 52, height: 52, borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}` }}>
-                      <img src={post.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      <img src={resolveImageUrl(post.imageUrl)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     </div>
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>

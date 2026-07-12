@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { C } from "../../theme";
-import { apiFetch, authHeaders } from "../../lib/apiFetch";
+import { apiFetch, authHeaders, resolveImageUrl } from "../../lib/apiFetch";
 import { Btn } from "./Btn";
 import { Select } from "./Inputs";
 import { Field, Input } from "./Inputs";
@@ -180,7 +180,7 @@ export function ImagePanel({ postText, onChange, compact = false, forceOpen = fa
       {preview && (
         <div className="fade-up" style={{ marginTop: 14, position: "relative" }}>
           <img
-            src={preview.url}
+            src={resolveImageUrl(preview.url)}
             alt="Post image preview"
             style={{ width: "100%", borderRadius: 10, border: `1px solid ${C.border}`, display: "block", maxHeight: 320, objectFit: "cover" }}
           />

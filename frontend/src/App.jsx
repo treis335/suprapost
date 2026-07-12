@@ -1201,7 +1201,7 @@ export default function App() {
                     <Pill color={p.auto ? C.accent2 : C.accent}>{p.auto ? "↻ automatic" : "✋ manual"}</Pill>
                     <span style={{ fontSize: "0.66rem", color: C.muted, fontFamily: C.mono }}>{new Date(p.time).toLocaleString()}</span>
                   </div>
-                  <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6, marginBottom: 10 }}>{p.text.substring(0, 160)}{p.text.length > 160 ? "…" : ""}</div>
+                  <div style={{ fontSize: "0.8rem", color: C.text2, lineHeight: 1.6, marginBottom: 10 }}>{p.text ? `${p.text.substring(0, 160)}${p.text.length > 160 ? "…" : ""}` : "🖼 Image post"}</div>
                   {p.results && Object.keys(p.results).length > 0 && (
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {Object.entries(p.results).map(([id, r]) => (
@@ -1475,7 +1475,7 @@ export default function App() {
               <div style={{ height: 1, background: C.border, margin: "5px 0" }} />
               <div style={{ fontSize: "0.64rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.15em" }}>Latest Post</div>
               <Card style={{ fontSize: "0.76rem", color: C.text2, lineHeight: 1.6 }}>
-                {posts[0].text.substring(0, 110)}{posts[0].text.length > 110 ? "…" : ""}
+                {posts[0].text ? `${posts[0].text.substring(0, 110)}${posts[0].text.length > 110 ? "…" : ""}` : "🖼 Image post"}
               </Card>
             </>
           )}
