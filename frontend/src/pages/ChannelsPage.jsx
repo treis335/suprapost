@@ -157,11 +157,11 @@ function ChannelRow({ id, channel, onSave, onToggle, onTest }) {
           <Field key={f.key} label={f.label}>
             <div style={{ position: "relative" }}>
               <input
-                type="password"
+                type="text"
                 placeholder={f.placeholder || ""}
                 value={creds[f.key] ?? ""}
                 onChange={(e) => setField(f.key, e.target.value)}
-                autoComplete="new-password"
+                autoComplete="off"
                 style={{
                   width: "100%", boxSizing: "border-box",
                   background: C.bg, color: C.text,
