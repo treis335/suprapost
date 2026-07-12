@@ -78,6 +78,14 @@ async function main() {
   // Serve generated/uploaded images so Discord embeds and previews work
   app.use("/images", express.static(IMAGES_DIR));
 
+  // No-cache on all /api responses — stops Cloudflare tunnel caching stale data
+  app.use("/api", (req, res, next) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    next();
+  });
+
   // ── Resume automation for every user who had it running ──
   resumeAllAutomations(db);
 

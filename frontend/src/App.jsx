@@ -973,9 +973,12 @@ export default function App() {
         if (data.post.scores) setScores(data.post.scores);
         if (data.log) setGenLog(data.log);
         setStats(s => ({ ...s, totalGenerations: (s.totalGenerations || 0) + 1 }));
-        // Don't guess the charge locally (it depends on the mode's real
-        // price, not the old flat costPerPost) — just fetch the real balance.
+        // Fetch real balance from server — do it twice (immediate + 2s later)
+        // to handle any backend async processing delay.
         api.get("/wallet").then(w => { if (!w.unauthorized) setWallet(w); }).catch(() => {});
+        setTimeout(() => {
+          api.get("/wallet").then(w => { if (!w.unauthorized) setWallet(w); }).catch(() => {});
+        }, 2000);
       } else if (data.log) setGenLog(data.log);
     } catch (err) { setGenLog([{ time: new Date().toISOString(), msg: `✕ Error: ${err.message}` }]); }
     setGenerating(false);

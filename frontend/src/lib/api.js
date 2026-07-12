@@ -1,9 +1,12 @@
 import { getSession, clearSession } from "../wallet";
 
-// BASE is the backend URL.
-// In production (Vercel): set VITE_API_URL environment variable to your tunnel URL.
-// In development: leave empty — Vite proxies /api/* to localhost:3001.
 const BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+
+export function resolveImageUrl(url) {
+  if (!url) return null;
+  if (/^https?:\/\//.test(url)) return url;
+  return `${BASE}${url}`;
+}
 
 function authHeaders() {
   const session = getSession();
@@ -13,28 +16,20 @@ function authHeaders() {
 async function parseResponse(res) {
   const text = await res.text();
   if (!text) return { ok: res.ok };
-  try {
-    return JSON.parse(text);
-  } catch {
-    console.error("[api] Non-JSON response:", res.status, text.slice(0, 120));
+  try { return JSON.parse(text); }
+  catch {
+    console.error("[api] Non-JSON:", res.status, text.slice(0, 120));
     return { ok: false, error: `Server error ${res.status}` };
   }
 }
 
-// Images (like /images/xyz.jpg) are served by the BACKEND, not the frontend
-// origin — on a split deployment (Vercel frontend + VPS backend) a bare
-// relative path resolves against the wrong domain. Always route it through
-// the backend's own base URL.
-export function resolveImageUrl(url) {
-  if (!url) return null;
-  if (/^https?:\/\//.test(url)) return url; // already absolute
-  return `${BASE}${url}`;
-}
+// Always no-store so Cloudflare tunnel never caches API responses
+const NO_CACHE = { "Cache-Control": "no-store", "Pragma": "no-cache" };
 
 export const api = {
   async get(path) {
     const res = await fetch(`${BASE}/api${path}`, {
-      headers: { ...authHeaders() },
+      headers: { ...authHeaders(), ...NO_CACHE },
     });
     if (res.status === 401) { clearSession(); window.location.reload(); return { unauthorized: true }; }
     return parseResponse(res);
@@ -42,7 +37,7 @@ export const api = {
   async post(path, body) {
     const res = await fetch(`${BASE}/api${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...authHeaders(), ...NO_CACHE },
       body: JSON.stringify(body || {}),
     });
     if (res.status === 401) { clearSession(); window.location.reload(); return { unauthorized: true }; }
@@ -51,7 +46,7 @@ export const api = {
   async del(path) {
     const res = await fetch(`${BASE}/api${path}`, {
       method: "DELETE",
-      headers: { ...authHeaders() },
+      headers: { ...authHeaders(), ...NO_CACHE },
     });
     if (res.status === 401) { clearSession(); window.location.reload(); return { unauthorized: true }; }
     return parseResponse(res);
