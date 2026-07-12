@@ -74,25 +74,33 @@ async function generateWithTogether(prompt) {
   const apiKey = process.env.TOGETHER_API_KEY;
   if (!apiKey) throw new Error("TOGETHER_API_KEY not set");
 
-  const res = await axios.post(
-    "https://api.together.xyz/v1/images/generations",
-    {
-      model:           "black-forest-labs/FLUX.1-schnell-Free",
-      prompt,
-      width:           768,
-      height:          768,
-      steps:           4,
-      n:               1,
-      response_format: "b64_json",
-    },
-    {
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+  let res;
+  try {
+    res = await axios.post(
+      "https://api.together.xyz/v1/images/generations",
+      {
+        model:           "black-forest-labs/FLUX.1-schnell",
+        prompt,
+        width:           768,
+        height:          768,
+        steps:           4,
+        n:               1,
+        response_format: "b64_json",
       },
-      timeout: 60000,
-    }
-  );
+      {
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        timeout: 60000,
+      }
+    );
+  } catch (err) {
+    // Surface Together's actual error body (e.g. bad model id, invalid
+    // params, quota) instead of just the generic axios status message.
+    const detail = err.response?.data?.error?.message || err.response?.data?.error || err.response?.data;
+    throw new Error(detail ? `Together AI: ${JSON.stringify(detail)}` : err.message);
+  }
 
   const b64 = res.data?.data?.[0]?.b64_json;
   if (!b64) throw new Error("No image data in Together AI response");
