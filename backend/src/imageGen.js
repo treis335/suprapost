@@ -1,8 +1,5 @@
 /**
- * imageGen.js — Image generation via Together AI (primary) + ModelsLab (fallback)
- *
- * Together AI: FLUX.1-schnell-Free (free tier) or paid models
- * ModelsLab: fallback if Together AI fails or key not set
+ * imageGen.js — Image generation via Together AI (FLUX.1-schnell)
  */
 
 const axios  = require("axios");
@@ -112,97 +109,27 @@ async function generateWithTogether(prompt) {
   return { filename, imagePath };
 }
 
-// ── ModelsLab (fallback) ──────────────────────────────────────────────────────
-async function generateWithModelsLab(prompt) {
-  const apiKey = process.env.MODELSLAB_API_KEY;
-  if (!apiKey) throw new Error("MODELSLAB_API_KEY not set");
-
-  const payload = {
-    key:                 apiKey,
-    model_id:            "flux-schnell",
-    prompt,
-    negative_prompt:     "text, watermark, logo, blurry, deformed, ugly, duplicate",
-    width:               "512",
-    height:              "512",
-    samples:             "1",
-    num_inference_steps: "20",
-    guidance_scale:      5,
-    safety_checker:      "no",
-    tomesd:              "yes",
-    clip_skip:           "2",
-    scheduler:           "DPMSolverMultistepScheduler",
-  };
-
-  const res  = await axios.post(
-    "https://modelslab.com/api/v7/images/text-to-image",
-    payload,
-    { headers: { "Content-Type": "application/json" }, timeout: 90000 }
-  );
-
-  const data = res.data;
-  if (data.status === "error") throw new Error(data.message || "ModelsLab error");
-
-  let imageUrl;
-  if (data.status === "processing") {
-    for (let i = 0; i < 12; i++) {
-      await new Promise(r => setTimeout(r, 5000));
-      const poll = await axios.post(data.fetch_result_url, { key: apiKey }, { timeout: 15000 });
-      if (poll.data.status === "success") { imageUrl = poll.data.output?.[0]; break; }
-      if (poll.data.status === "error")   throw new Error(poll.data.message);
-    }
-  } else {
-    imageUrl = Array.isArray(data.output) ? data.output[0] : data.output;
-  }
-
-  if (!imageUrl) throw new Error("No output URL from ModelsLab");
-
-  const imgRes    = await axios.get(imageUrl, { responseType: "arraybuffer", timeout: 60000 });
-  const filename  = `${uuidv4()}.jpg`;
-  const imagePath = path.join(IMAGES_DIR, filename);
-  fs.writeFileSync(imagePath, Buffer.from(imgRes.data));
-  return { filename, imagePath };
-}
-
 // ── Main generateImage ────────────────────────────────────────────────────────
 async function generateImage({ postText = "", style = "auto", customPrompt = "", modo_economico = false }) {
-  const hasTogether  = !!process.env.TOGETHER_API_KEY;
-  const hasModelsLab = !!process.env.MODELSLAB_API_KEY;
+  const hasTogether = !!process.env.TOGETHER_API_KEY;
 
-  if (!hasTogether && !hasModelsLab) {
-    console.warn("[imageGen] No image API key set — skipping");
+  if (!hasTogether) {
+    console.warn("[imageGen] No TOGETHER_API_KEY set — skipping");
     return { ok: false, simulated: true, error: "No image API key configured" };
   }
 
   const prompt = await buildImagePrompt(postText, style, customPrompt);
   console.log(`[imageGen] Prompt: "${prompt.slice(0, 90)}…"`);
 
-  // Try Together AI first (cheaper, more reliable)
-  if (hasTogether) {
-    try {
-      console.log("[imageGen] Trying Together AI (FLUX.1-schnell-Free)...");
-      const { filename, imagePath } = await generateWithTogether(prompt);
-      console.log(`[imageGen] Together AI success → ${filename}`);
-      return { ok: true, imagePath, imageFilename: filename, prompt };
-    } catch (err) {
-      console.warn("[imageGen] Together AI failed:", err.message);
-      if (!hasModelsLab) return { ok: false, error: err.message, prompt };
-    }
+  try {
+    console.log("[imageGen] Generating via Together AI (FLUX.1-schnell)...");
+    const { filename, imagePath } = await generateWithTogether(prompt);
+    console.log(`[imageGen] Together AI success → ${filename}`);
+    return { ok: true, imagePath, imageFilename: filename, prompt };
+  } catch (err) {
+    console.error("[imageGen] Together AI failed:", err.message);
+    return { ok: false, error: err.message, prompt };
   }
-
-  // Fallback to ModelsLab
-  if (hasModelsLab) {
-    try {
-      console.log("[imageGen] Trying ModelsLab fallback...");
-      const { filename, imagePath } = await generateWithModelsLab(prompt);
-      console.log(`[imageGen] ModelsLab success → ${filename}`);
-      return { ok: true, imagePath, imageFilename: filename, prompt };
-    } catch (err) {
-      console.error("[imageGen] ModelsLab also failed:", err.message);
-      return { ok: false, error: err.message, prompt };
-    }
-  }
-
-  return { ok: false, error: "Image generation failed", prompt };
 }
 
 // ── User upload ───────────────────────────────────────────────────────────────
