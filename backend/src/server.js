@@ -74,6 +74,17 @@ async function main() {
   }));
   app.use(express.json({ limit: "20mb" })); // generous limit for base64 image uploads
 
+  // Never let a CDN/tunnel/browser cache API responses — wallet balance,
+  // automation state, etc. must always be fresh. Static assets (images,
+  // the built frontend if served from here) are unaffected since this only
+  // touches /api/*.
+  app.use("/api", (req, res, next) => {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+    next();
+  });
+
 
   // Serve generated/uploaded images so Discord embeds and previews work
   app.use("/images", express.static(IMAGES_DIR));

@@ -22,6 +22,7 @@ export function authHeaders() {
 
 export async function apiFetch(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
+    cache: "no-store",
     ...options,
     headers: {
       ...authHeaders(),

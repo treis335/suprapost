@@ -95,14 +95,21 @@ class JsonDB {
     this._writeLock = Promise.resolve(); // serialise all writes
   }
 
-  async read() {
-    try {
-      const raw = fs.readFileSync(this.filePath, "utf-8");
-      this.data = JSON.parse(raw);
-    } catch (err) {
-      this.data = this.data || JSON.parse(JSON.stringify(this.defaults));
-    }
-    return this.data;
+  // Reads also go through the lock chain — otherwise a concurrent read()
+  // (e.g. GET /api/wallet's 5s poll) could still reassign `this.data` in
+  // the middle of an in-progress transaction() and orphan its mutations.
+  read() {
+    const run = this._writeLock.then(() => {
+      try {
+        const raw = fs.readFileSync(this.filePath, "utf-8");
+        this.data = JSON.parse(raw);
+      } catch (err) {
+        this.data = this.data || JSON.parse(JSON.stringify(this.defaults));
+      }
+      return this.data;
+    });
+    this._writeLock = run.then(() => {}, () => {});
+    return run;
   }
 
   // All writes are serialised through a promise chain so two concurrent
@@ -114,6 +121,41 @@ class JsonDB {
       fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), "utf-8");
     }).catch(err => console.error("[db] write() failed:", err.message));
     return this._writeLock;
+  }
+
+  /**
+   * Runs fn as a single atomic read-modify-write unit: no other call to
+   * read(), write(), or transaction() can interleave with it, even across
+   * the awaited async work inside fn (as long as that work doesn't itself
+   * call read()/write()/transaction() again).
+   *
+   * This exists because read() alone reassigns `this.data` to a fresh
+   * object on every call — if some *other* request calls read() in the
+   * middle of a caller's own read → mutate → write sequence (e.g. the
+   * frontend's 5s wallet poll firing while a post is mid-generation), that
+   * caller's in-memory mutations get silently orphaned and the eventual
+   * write() persists the *other* caller's stale snapshot instead — a
+   * classic lost-update bug. Anything that touches money (charging for a
+   * post, crediting a deposit, paying a referral commission) MUST go
+   * through this, not bare read()/write() calls.
+   */
+  transaction(fn) {
+    const run = this._writeLock.then(async () => {
+      try {
+        const raw = fs.readFileSync(this.filePath, "utf-8");
+        this.data = JSON.parse(raw);
+      } catch {
+        this.data = this.data || JSON.parse(JSON.stringify(this.defaults));
+      }
+      const result = await fn(this.data);
+      fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), "utf-8");
+      return result;
+    });
+    // Keep the lock chain alive even if this transaction throws, but let
+    // the error propagate to whoever called transaction().
+    this._writeLock = run.then(() => {}, () => {});
+    return run;
   }
 
   /**
