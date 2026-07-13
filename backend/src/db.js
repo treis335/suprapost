@@ -92,6 +92,7 @@ class JsonDB {
     this.filePath = filePath;
     this.defaults = defaults;
     this.data = null;
+    this._writeLock = Promise.resolve(); // serialise all writes
   }
 
   async read() {
@@ -104,9 +105,15 @@ class JsonDB {
     return this.data;
   }
 
-  async write() {
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), "utf-8");
+  // All writes are serialised through a promise chain so two concurrent
+  // operations (e.g. engine charging + scheduler reading) can never
+  // interleave their read-modify-write cycles.
+  write() {
+    this._writeLock = this._writeLock.then(() => {
+      fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), "utf-8");
+    }).catch(err => console.error("[db] write() failed:", err.message));
+    return this._writeLock;
   }
 
   /**
