@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require("uuid");
-const { generatePost, scorePost } = require("./deepseek");
+const { generatePost, critiquePost, pickStyleExamples } = require("./deepseek");
 const { generateImage } = require("./imageGen");
 const { publishToChannels } = require("./channels");
 const { getPricing, freshUserData } = require("./db");
@@ -69,7 +69,9 @@ async function runGenerationCycleLocked(db, address, opts = {}) {
   let text = null;
   if (mode === "text" || mode === "both") {
     push("🤖 Generating text via DeepSeek...");
-    text = await generatePost(settings);
+    const styleExamples = pickStyleExamples(user.posts, 3);
+    if (styleExamples.length) push(`📚 Learning from ${styleExamples.length} of your top-performing past posts`);
+    text = await generatePost(settings, styleExamples);
     push("✓ Text generated");
   }
 
@@ -104,7 +106,7 @@ async function runGenerationCycleLocked(db, address, opts = {}) {
     return { ok: false, reason: "generation_failed", detail: "Image generation failed", log };
   }
 
-  const { scores, avg } = scorePost();
+  const { scores, avg } = await critiquePost(text, settings);
   push(`🧠 Self-critique: ${avg}/10`);
 
   const postId = uuidv4();
@@ -139,6 +141,7 @@ async function runGenerationCycleLocked(db, address, opts = {}) {
       text,
       imageUrl: imageFilename ? `/images/${imageFilename}` : null,
       avgScore: avg,
+      rating:   null, // "up" | "down" | null — set later by the user in History
       time:     new Date().toISOString(),
       auto:     autoPost,
       results:  {},

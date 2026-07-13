@@ -1016,6 +1016,10 @@ export default function App() {
   async function clearHistory() {
     try { await api.del("/posts"); setPosts([]); setStats(s => ({ ...s, totalPosts: 0 })); } catch {}
   }
+  async function ratePost(id, rating) {
+    setPosts(ps => ps.map(p => p.id === id ? { ...p, rating } : p)); // optimistic
+    try { await api.post(`/posts/${id}/rating`, { rating }); } catch {}
+  }
 
   const enabledChannelCount = channels.filter(c => c.enabled && c.connected).length;
 
@@ -1225,6 +1229,16 @@ export default function App() {
                           {CHANNEL_ICONS[id] || "●"} {channels.find(c=>c.id===id)?.label || id} {r.ok ? "sent" : "skipped"}
                         </Pill>
                       ))}
+                    </div>
+                  )}
+                  {p.text && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 11, paddingTop: 11, borderTop: `1px solid ${C.border}` }}>
+                      <span style={{ fontSize: "0.68rem", color: C.muted }}>Rate this style:</span>
+                      <button onClick={() => ratePost(p.id, p.rating === "up" ? null : "up")}
+                        style={{ all: "unset", cursor: "pointer", fontSize: "1rem", opacity: p.rating === "up" ? 1 : 0.4, filter: p.rating === "up" ? `drop-shadow(0 0 4px ${C.supra})` : "none" }}>👍</button>
+                      <button onClick={() => ratePost(p.id, p.rating === "down" ? null : "down")}
+                        style={{ all: "unset", cursor: "pointer", fontSize: "1rem", opacity: p.rating === "down" ? 1 : 0.4, filter: p.rating === "down" ? `drop-shadow(0 0 4px ${C.danger})` : "none" }}>👎</button>
+                      {p.rating === "up" && <span style={{ fontSize: "0.66rem", color: C.supra }}>used as a style example for future posts</span>}
                     </div>
                   )}
                 </Card>

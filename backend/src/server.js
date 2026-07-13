@@ -590,6 +590,27 @@ async function main() {
     res.json({ ok: true });
   });
 
+  // POST /api/posts/:id/rating — 👍/👎 feedback used to teach future
+  // generations which of the user's own posts to imitate (see
+  // deepseek.js's pickStyleExamples). Uses a transaction so this can never
+  // race with a generation cycle writing a new post at the same time.
+  app.post("/api/posts/:id/rating", requireAuth, async (req, res) => {
+    const { rating } = req.body; // "up" | "down" | null
+    if (![ "up", "down", null ].includes(rating)) {
+      return res.status(400).json({ ok: false, error: "rating must be 'up', 'down', or null" });
+    }
+    const key = req.walletAddress.replace(/^0x/, "").toLowerCase();
+    const result = await db.transaction((data) => {
+      const u = data.users[key];
+      const post = u?.posts?.find(p => p.id === req.params.id);
+      if (!post) return { ok: false };
+      post.rating = rating;
+      return { ok: true };
+    });
+    if (!result.ok) return res.status(404).json({ ok: false, error: "Post not found" });
+    res.json({ ok: true });
+  });
+
   app.get("/api/stats", requireAuth, async (req, res) => {
     await db.read();
     res.json(db.forUser(req.walletAddress).stats);

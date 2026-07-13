@@ -10,8 +10,12 @@ const FALLBACK_TWEETS = [
  * Generates a post using DeepSeek's chat completion API based on the
  * user's content profile (settings) stored in the DB.
  */
-async function generatePost(settings) {
+async function generatePost(settings, styleExamples = []) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
+
+  const learnedExamples = styleExamples.length
+    ? `\n\nThese are the user's own past posts that performed best (highest-rated) — match this energy, structure and hooks, but never repeat them verbatim:\n${styleExamples.map((t, i) => `${i + 1}. ${t}`).join("\n")}`
+    : "";
 
   const systemPrompt = `You are a crypto/Web3 social media expert. Generate viral, high-quality posts.
 Niche: ${settings.niche || "Supra blockchain, DeFi"}
@@ -19,7 +23,7 @@ Tone: ${settings.tone || "technical"}
 Target audience: ${settings.audience || "Web3 developers and DeFi traders"}
 Post type: ${settings.postType || "alpha"}
 Avoid: ${settings.avoid || "FUD, price predictions"}
-${settings.examples ? "Style examples:\n" + settings.examples : ""}
+${settings.examples ? "Style examples:\n" + settings.examples : ""}${learnedExamples}
 
 Rules:
 - Max 280 characters
@@ -82,19 +86,88 @@ function pickFallback() {
 }
 
 /**
- * Simple self-critique scoring — simulated for now.
- * Could later call DeepSeek again with a "rate this post" prompt.
+ * Real self-critique — asks DeepSeek to score the post it (or a fallback)
+ * just produced, on four dimensions, with brief reasoning. This is the
+ * signal used both to show the user a genuine quality score and to decide
+ * which of their past posts are worth feeding back in as style examples.
+ * Falls back to a neutral flat score if the API/parsing fails, rather than
+ * ever inventing a fake high score.
  */
-function scorePost() {
-  const rand = (a, b) => Math.min(10, a + Math.random() * (b - a));
-  const scores = [
-    { label: "Relevance", score: rand(7, 10) },
-    { label: "Engagement", score: rand(7, 10) },
-    { label: "Clarity", score: rand(7.5, 10) },
-    { label: "Originality", score: rand(6.5, 10) },
-  ];
-  const avg = scores.reduce((a, b) => a + b.score, 0) / scores.length;
-  return { scores, avg: +avg.toFixed(1) };
+async function critiquePost(text, settings) {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const neutral = () => {
+    const scores = [
+      { label: "Relevance", score: 7 },
+      { label: "Engagement", score: 7 },
+      { label: "Clarity", score: 7 },
+      { label: "Originality", score: 7 },
+    ];
+    return { scores, avg: 7 };
+  };
+  if (!apiKey || !text) return neutral();
+
+  const prompt = `Rate this social media post as an expert crypto/Web3 social media critic. Be honest and critical — most posts are mediocre, reserve 9-10 for genuinely excellent ones.
+
+Post:
+"""${text}"""
+
+Niche: ${settings.niche || "Supra blockchain, DeFi"} | Target audience: ${settings.audience || "Web3 developers and DeFi traders"}
+
+Score each 0-10 (can use decimals): relevance (fits the niche/audience), engagement (hook strength, shareability), clarity (easy to read, no fluff), originality (not generic/cliché).
+
+Return ONLY this JSON, nothing else: {"relevance": X, "engagement": X, "clarity": X, "originality": X}`;
+
+  try {
+    const res = await axios.post(
+      "https://api.deepseek.com/chat/completions",
+      {
+        model: "deepseek-chat",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 100,
+        temperature: 0.3,
+      },
+      {
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        timeout: 20000,
+        validateStatus: (status) => status < 500,
+      }
+    );
+    const raw = res.data?.choices?.[0]?.message?.content?.trim() || "";
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return neutral();
+    const parsed = JSON.parse(match[0]);
+    const clamp = (n) => Math.max(0, Math.min(10, Number(n)));
+    const scores = [
+      { label: "Relevance",   score: clamp(parsed.relevance) },
+      { label: "Engagement",  score: clamp(parsed.engagement) },
+      { label: "Clarity",     score: clamp(parsed.clarity) },
+      { label: "Originality", score: clamp(parsed.originality) },
+    ];
+    if (scores.some(s => !isFinite(s.score))) return neutral();
+    const avg = scores.reduce((a, b) => a + b.score, 0) / scores.length;
+    return { scores, avg: +avg.toFixed(1) };
+  } catch (err) {
+    console.warn("[deepseek] Self-critique failed, using neutral score:", err.message);
+    return neutral();
+  }
 }
 
-module.exports = { generatePost, scorePost };
+/**
+ * Picks the best-performing recent posts to feed back in as style examples.
+ * "Best" = user gave a 👍, or (if no feedback yet) the highest real
+ * self-critique average. Only text-bearing posts are eligible.
+ */
+function pickStyleExamples(posts = [], limit = 3) {
+  const eligible = (posts || []).filter(p => p.text);
+  const scored = eligible.map(p => ({
+    text: p.text,
+    weight: (p.rating === "up" ? 100 : p.rating === "down" ? -100 : 0) + (p.avgScore || 0),
+  }));
+  return scored
+    .filter(p => p.weight > 0 || p.weight === 0) // exclude down-rated (negative weight)
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, limit)
+    .map(p => p.text);
+}
+
+module.exports = { generatePost, critiquePost, pickStyleExamples };
