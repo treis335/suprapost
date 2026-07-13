@@ -898,15 +898,26 @@ export default function App() {
   const refreshAll = useCallback(async () => {
     if (!session) return;
     try {
+      // Fetch each independently so one failure doesn't block the others
       const [s, w, a, p, st, pr] = await Promise.all([
-        api.get("/settings"), api.get("/wallet"), api.get("/automation"), api.get("/posts"), api.get("/stats"),
+        api.get("/settings").catch(() => ({})),
+        api.get("/wallet").catch(() => ({})),
+        api.get("/automation").catch(() => ({})),
+        api.get("/posts").catch(() => []),
+        api.get("/stats").catch(() => ({})),
         api.get("/pricing").catch(() => ({ ok: false })),
       ]);
+      // Only sign out if settings explicitly says unauthorized
       if (s.unauthorized) { handleSignOut(); return; }
-      if (!editingRef.current) setSettings(s);
-      setWallet(w); setAutomation(a); setPosts(p); setStats(st);
-      if (pr?.ok) setPricing(pr.pricing);
-    } catch {}
+      if (s && Object.keys(s).length > 0 && !editingRef.current) setSettings(s);
+      if (w && w.balance !== undefined) setWallet(w);
+      if (a && a.running !== undefined) setAutomation(a);
+      if (Array.isArray(p)) setPosts(p);
+      if (st && st.totalGenerations !== undefined) setStats(st);
+      if (pr?.ok && pr.pricing) setPricing(pr.pricing);
+    } catch (err) {
+      console.warn("[refreshAll] error:", err?.message);
+    }
   }, [session]);
 
   useEffect(() => {
@@ -920,7 +931,7 @@ export default function App() {
     refreshAll();
     const interval = setInterval(refreshAll, 5000);
     return () => clearInterval(interval);
-  }, [session]);
+  }, [refreshAll]);
 
   useEffect(() => {
     clearInterval(timerRef.current);
