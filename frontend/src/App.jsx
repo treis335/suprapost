@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { C } from "./theme";
+import { C, getSavedThemeMode, applyThemeMode } from "./theme";
 import { isStarKeyInstalled, waitForStarKey, signInWithWallet, getSession, clearSession, shortAddress } from "./wallet";
 import { ComposePage } from "./pages/ComposePage";
 import { ReferralPage } from "./pages/ReferralPage";
@@ -895,6 +895,13 @@ export default function App() {
 
   function handleSignOut() { clearSession(); setSession(null); }
 
+  const [themeMode, setThemeMode] = useState(() => getSavedThemeMode());
+  function toggleTheme() {
+    const next = themeMode === "light" ? "dark" : "light";
+    applyThemeMode(next);
+    setThemeMode(next); // bumps state so the whole tree re-renders with the new C values
+  }
+
   const refreshAll = useCallback(async () => {
     if (!session) return;
     try {
@@ -1053,7 +1060,13 @@ export default function App() {
               {shortAddress(session?.address)}
             </div>
           </div>
-          <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={toggleTheme} title="Toggle theme" style={{
+              width: 34, height: 34, borderRadius: 10, border: `1px solid ${C.border}`, background: C.raised,
+              color: C.text, cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>{themeMode === "light" ? "🌙" : "☀️"}</button>
+            <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
+          </div>
         </div>
       </Card>
 
@@ -1416,7 +1429,7 @@ export default function App() {
         <GlobalStyle />
         {toastEl}
         <LowBalanceBanner balance={wallet.balance + (wallet.creditBalance || 0)} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.7)", backdropFilter: "blur(10px)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: `1px solid ${C.border}`, background: C.surface + "cc", backdropFilter: "blur(10px)" }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: "1.15rem", fontFamily: C.display }}>Supra<span style={{ color: C.accent }}>Post</span></div>
             <div style={{ fontSize: "0.62rem", color: C.muted }}>AI Social Automation</div>
@@ -1444,7 +1457,7 @@ export default function App() {
       <GlobalStyle />
       {toastEl}
       <LowBalanceBanner balance={wallet.balance + (wallet.creditBalance || 0)} costPerPost={wallet.costPerPost} onDeposit={() => setTab("setup")} />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 32px", borderBottom: `1px solid ${C.border}`, background: "rgba(16,14,26,0.6)", backdropFilter: "blur(10px)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 32px", borderBottom: `1px solid ${C.border}`, background: C.surface + "cc", backdropFilter: "blur(10px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ fontWeight: 700, fontSize: "1.25rem", fontFamily: C.display, letterSpacing: "-0.01em" }}>Supra<span style={{ color: C.accent }}>Post</span></div>
           <span style={{ fontSize: "0.74rem", color: C.muted, borderLeft: `1px solid ${C.border}`, paddingLeft: 14 }}>AI Social Automation</span>
@@ -1453,6 +1466,10 @@ export default function App() {
           <Pill color={C.supra}>⬡ {fmt(wallet.balance + (wallet.creditBalance || 0))} SUPRA</Pill>
           <Pill color={automation.running ? C.supra : C.muted} dot pulse={automation.running}>{automation.running ? "Automation active" : "Idle"}</Pill>
           <Pill color={C.accent2} title={session?.address}>{shortAddress(session?.address)}</Pill>
+          <button onClick={toggleTheme} title="Toggle theme" style={{
+            width: 30, height: 30, borderRadius: 9, border: `1px solid ${C.border}`, background: C.raised,
+            color: C.text, cursor: "pointer", fontSize: "0.9rem", display: "flex", alignItems: "center", justifyContent: "center",
+          }}>{themeMode === "light" ? "🌙" : "☀️"}</button>
           <Btn variant="ghost" size="sm" onClick={handleSignOut}>Sign Out</Btn>
         </div>
       </div>
