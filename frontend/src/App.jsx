@@ -1016,9 +1016,10 @@ export default function App() {
   async function clearHistory() {
     try { await api.del("/posts"); setPosts([]); setStats(s => ({ ...s, totalPosts: 0 })); } catch {}
   }
-  async function ratePost(id, rating) {
-    setPosts(ps => ps.map(p => p.id === id ? { ...p, rating } : p)); // optimistic
-    try { await api.post(`/posts/${id}/rating`, { rating }); } catch {}
+  async function ratePost(id, rating, target = "both") {
+    const patch = target === "both" ? { textRating: rating, imageRating: rating } : { [`${target}Rating`]: rating };
+    setPosts(ps => ps.map(p => p.id === id ? { ...p, ...patch } : p)); // optimistic
+    try { await api.post(`/posts/${id}/rating`, { rating, target }); } catch {}
   }
 
   const enabledChannelCount = channels.filter(c => c.enabled && c.connected).length;
@@ -1232,13 +1233,27 @@ export default function App() {
                     </div>
                   )}
                   {(p.text || p.imageUrl) && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 11, paddingTop: 11, borderTop: `1px solid ${C.border}` }}>
-                      <span style={{ fontSize: "0.68rem", color: C.muted }}>Rate this style:</span>
-                      <button onClick={() => ratePost(p.id, p.rating === "up" ? null : "up")}
-                        style={{ all: "unset", cursor: "pointer", fontSize: "1rem", opacity: p.rating === "up" ? 1 : 0.4, filter: p.rating === "up" ? `drop-shadow(0 0 4px ${C.supra})` : "none" }}>👍</button>
-                      <button onClick={() => ratePost(p.id, p.rating === "down" ? null : "down")}
-                        style={{ all: "unset", cursor: "pointer", fontSize: "1rem", opacity: p.rating === "down" ? 1 : 0.4, filter: p.rating === "down" ? `drop-shadow(0 0 4px ${C.danger})` : "none" }}>👎</button>
-                      {p.rating === "up" && <span style={{ fontSize: "0.66rem", color: C.supra }}>used as a style example for future posts</span>}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 11, paddingTop: 11, borderTop: `1px solid ${C.border}` }}>
+                      {p.text && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontSize: "0.68rem", color: C.muted, minWidth: 40 }}>{p.imageUrl ? "Text:" : "Rate:"}</span>
+                          <button onClick={() => ratePost(p.id, p.textRating === "up" ? null : "up", "text")}
+                            style={{ all: "unset", cursor: "pointer", fontSize: "1rem", opacity: p.textRating === "up" ? 1 : 0.4, filter: p.textRating === "up" ? `drop-shadow(0 0 4px ${C.supra})` : "none" }}>👍</button>
+                          <button onClick={() => ratePost(p.id, p.textRating === "down" ? null : "down", "text")}
+                            style={{ all: "unset", cursor: "pointer", fontSize: "1rem", opacity: p.textRating === "down" ? 1 : 0.4, filter: p.textRating === "down" ? `drop-shadow(0 0 4px ${C.danger})` : "none" }}>👎</button>
+                          {p.textRating === "up" && <span style={{ fontSize: "0.66rem", color: C.supra }}>saved as a style example</span>}
+                        </div>
+                      )}
+                      {p.imageUrl && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontSize: "0.68rem", color: C.muted, minWidth: 40 }}>{p.text ? "Image:" : "Rate:"}</span>
+                          <button onClick={() => ratePost(p.id, p.imageRating === "up" ? null : "up", "image")}
+                            style={{ all: "unset", cursor: "pointer", fontSize: "1rem", opacity: p.imageRating === "up" ? 1 : 0.4, filter: p.imageRating === "up" ? `drop-shadow(0 0 4px ${C.supra})` : "none" }}>👍</button>
+                          <button onClick={() => ratePost(p.id, p.imageRating === "down" ? null : "down", "image")}
+                            style={{ all: "unset", cursor: "pointer", fontSize: "1rem", opacity: p.imageRating === "down" ? 1 : 0.4, filter: p.imageRating === "down" ? `drop-shadow(0 0 4px ${C.danger})` : "none" }}>👎</button>
+                          {p.imageRating === "up" && <span style={{ fontSize: "0.66rem", color: C.supra }}>saved as a style example</span>}
+                        </div>
+                      )}
                     </div>
                   )}
                 </Card>

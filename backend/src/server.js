@@ -602,33 +602,40 @@ async function main() {
   const MAX_LIBRARY_ENTRIES = 12;
 
   app.post("/api/posts/:id/rating", requireAuth, async (req, res) => {
-    const { rating } = req.body; // "up" | "down" | null
+    const { rating, target = "both" } = req.body; // rating: "up"|"down"|null · target: "text"|"image"|"both"
     if (![ "up", "down", null ].includes(rating)) {
       return res.status(400).json({ ok: false, error: "rating must be 'up', 'down', or null" });
+    }
+    if (!["text", "image", "both"].includes(target)) {
+      return res.status(400).json({ ok: false, error: "target must be 'text', 'image', or 'both'" });
     }
     const key = req.walletAddress.replace(/^0x/, "").toLowerCase();
     const result = await db.transaction((data) => {
       const u = data.users[key];
       const post = u?.posts?.find(p => p.id === req.params.id);
       if (!post) return { ok: false };
-      post.rating = rating;
+
+      if (target === "text" || target === "both") post.textRating = rating;
+      if (target === "image" || target === "both") post.imageRating = rating;
 
       u.styleLibrary = u.styleLibrary || { textExamples: [], imagePrompts: [] };
       u.styleLibrary.textExamples = u.styleLibrary.textExamples || [];
       u.styleLibrary.imagePrompts = u.styleLibrary.imagePrompts || [];
 
-      // Always remove any prior library entry sourced from this post first
-      // (covers 👍 → 👎 changes, or re-rating).
-      u.styleLibrary.textExamples = u.styleLibrary.textExamples.filter(e => e.sourcePostId !== post.id);
-      u.styleLibrary.imagePrompts = u.styleLibrary.imagePrompts.filter(e => e.sourcePostId !== post.id);
-
-      if (rating === "up") {
-        if (post.text) {
+      if (target === "text" || target === "both") {
+        // Always remove any prior library entry sourced from this post's
+        // text first (covers 👍 → 👎 changes, or re-rating).
+        u.styleLibrary.textExamples = u.styleLibrary.textExamples.filter(e => e.sourcePostId !== post.id);
+        if (rating === "up" && post.text) {
           u.styleLibrary.textExamples.push({ text: post.text, avgScore: post.avgScore || 0, sourcePostId: post.id, addedAt: Date.now() });
           u.styleLibrary.textExamples.sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0));
           u.styleLibrary.textExamples = u.styleLibrary.textExamples.slice(0, MAX_LIBRARY_ENTRIES);
         }
-        if (post.imagePrompt) {
+      }
+
+      if (target === "image" || target === "both") {
+        u.styleLibrary.imagePrompts = u.styleLibrary.imagePrompts.filter(e => e.sourcePostId !== post.id);
+        if (rating === "up" && post.imagePrompt) {
           u.styleLibrary.imagePrompts.push({ prompt: post.imagePrompt, avgScore: post.avgScore || 0, sourcePostId: post.id, addedAt: Date.now() });
           u.styleLibrary.imagePrompts.sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0));
           u.styleLibrary.imagePrompts = u.styleLibrary.imagePrompts.slice(0, MAX_LIBRARY_ENTRIES);
