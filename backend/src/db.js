@@ -58,6 +58,13 @@ function freshUserData() {
       totalPosts: 0,
       supraEarned: 0,
     },
+    // Daily free-preview quota — resets automatically when the date changes.
+    // Covers Claude's real DeepSeek/image-gen API costs for people who
+    // generate a lot without ever posting.
+    freePreview: {
+      date:  null, // "YYYY-MM-DD", server-local
+      count: 0,
+    },
     referral: {
       referredBy: null,      // wallet address of whoever referred this user (permanent, immutable)
       referralEarned: 0,     // total SUPRA earned from referrals
@@ -180,6 +187,7 @@ class JsonDB {
     const u = this.data.users[key];
     if (u.wallet && u.wallet.creditBalance === undefined) u.wallet.creditBalance = 0;
     if (!u.styleLibrary) u.styleLibrary = { textExamples: [], imagePrompts: [] };
+    if (!u.freePreview) u.freePreview = { date: null, count: 0 };
     return u;
   }
 }

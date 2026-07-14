@@ -213,7 +213,7 @@ export function ComposePage({
                   />
                 </Field>
                 <Btn full variant="primary" onClick={onGenerate} disabled={generating}>
-                  {generating ? "Generating…" : "✦ Generate (free preview)"}
+                  {generating ? "Generating…" : "✦ Generate"}
                 </Btn>
                 {tweet && (
                   <div style={{ fontSize: "0.7rem", color: C.supra, marginTop: 2 }}>

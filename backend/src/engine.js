@@ -207,4 +207,69 @@ async function runGenerationCycleLocked(db, address, opts = {}) {
   return { ok: true, post, log };
 }
 
-module.exports = { runGenerationCycle };
+/**
+ * Atomically charges a user for a mode's price — credits first, then
+ * deposited balance. Shared by the automation/manual generation cycle and
+ * the Compose "pay to generate" flow, so there's exactly one place that
+ * knows how a charge is applied.
+ */
+async function chargeUser(db, address, amount) {
+  const key = normaliseAddress(address);
+  return db.transaction((data) => {
+    const u = data.users[key];
+    if (!u) return { ok: false, reason: "user_not_found" };
+    u.wallet.creditBalance = u.wallet.creditBalance || 0;
+    const funds = +((u.wallet.balance || 0) + u.wallet.creditBalance).toFixed(8);
+    if (funds < amount) return { ok: false, reason: "insufficient_balance" };
+
+    let rem = amount;
+    const fromCredit = Math.min(u.wallet.creditBalance, rem);
+    u.wallet.creditBalance = +(u.wallet.creditBalance - fromCredit).toFixed(8);
+    rem = +(rem - fromCredit).toFixed(8);
+    u.wallet.balance = +((u.wallet.balance || 0) - rem).toFixed(8);
+    u.stats.supraEarned = +((u.stats.supraEarned || 0) + amount).toFixed(2);
+
+    return { ok: true, balance: u.wallet.balance, creditBalance: u.wallet.creditBalance };
+  });
+}
+
+const FREE_PREVIEWS_PER_DAY = 5;
+
+/**
+ * For manual Compose preview generation (text or image, before posting).
+ * Uses up to FREE_PREVIEWS_PER_DAY free slots per user per day; once
+ * exhausted, charges `amount` the same way a real post would. Everything
+ * (date-rollover check, quota consumption, and the fallback charge) happens
+ * inside one atomic transaction so it can't race with anything else.
+ */
+async function consumeFreePreviewOrCharge(db, address, amount) {
+  const key = normaliseAddress(address);
+  return db.transaction((data) => {
+    const u = data.users[key];
+    if (!u) return { ok: false, reason: "user_not_found" };
+
+    const today = new Date().toISOString().slice(0, 10);
+    u.freePreview = u.freePreview || { date: null, count: 0 };
+    if (u.freePreview.date !== today) { u.freePreview.date = today; u.freePreview.count = 0; }
+
+    if (u.freePreview.count < FREE_PREVIEWS_PER_DAY) {
+      u.freePreview.count += 1;
+      return { ok: true, free: true, remaining: FREE_PREVIEWS_PER_DAY - u.freePreview.count };
+    }
+
+    u.wallet.creditBalance = u.wallet.creditBalance || 0;
+    const funds = +((u.wallet.balance || 0) + u.wallet.creditBalance).toFixed(8);
+    if (funds < amount) return { ok: false, reason: "insufficient_balance", free: false };
+
+    let rem = amount;
+    const fromCredit = Math.min(u.wallet.creditBalance, rem);
+    u.wallet.creditBalance = +(u.wallet.creditBalance - fromCredit).toFixed(8);
+    rem = +(rem - fromCredit).toFixed(8);
+    u.wallet.balance = +((u.wallet.balance || 0) - rem).toFixed(8);
+    u.stats.supraEarned = +((u.stats.supraEarned || 0) + amount).toFixed(2);
+
+    return { ok: true, free: false, charged: amount, balance: u.wallet.balance, creditBalance: u.wallet.creditBalance };
+  });
+}
+
+module.exports = { runGenerationCycle, chargeUser, consumeFreePreviewOrCharge, FREE_PREVIEWS_PER_DAY };

@@ -978,14 +978,20 @@ export default function App() {
   async function handleGenerate(opts = {}) {
     setGenerating(true); setGenLog([]); setTweet(""); setScores([]);
     try {
-      // Free preview — Compose only charges once, at actual publish time
-      // (see onPost / POST /api/post). This just drafts text to review.
+      // Free up to a daily quota, then charged the same as a real post —
+      // see FREE_PREVIEWS_PER_DAY in engine.js.
       const data = await api.post("/generate/preview", {});
       if (data.ok && data.post) {
         setTweet(data.post.text);
         if (data.post.scores) setScores(data.post.scores);
+        if (data.billing?.free) {
+          setGenLog([{ time: new Date().toISOString(), msg: `✓ Free preview (${data.billing.remaining} left today)` }]);
+        } else if (data.billing) {
+          setGenLog([{ time: new Date().toISOString(), msg: `⬡ Charged ${data.billing.charged} SUPRA — daily free previews used up` }]);
+          api.get("/wallet").then(w => { if (!w.unauthorized) setWallet(w); }).catch(() => {});
+        }
       } else if (data.error) {
-        setGenLog([{ time: new Date().toISOString(), msg: `✕ Error: ${data.error}` }]);
+        setGenLog([{ time: new Date().toISOString(), msg: `✕ ${data.error}` }]);
       }
     } catch (err) { setGenLog([{ time: new Date().toISOString(), msg: `✕ Error: ${err.message}` }]); }
     setGenerating(false);

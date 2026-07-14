@@ -25,6 +25,7 @@ export function ImagePanel({ postText, onChange, compact = false, forceOpen = fa
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState(null); // { url, filename }
   const [error, setError] = useState(null);
+  const [billing, setBilling] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
 
@@ -50,6 +51,7 @@ export function ImagePanel({ postText, onChange, compact = false, forceOpen = fa
       if (data.ok) {
         setPreview({ url: data.imageUrl, filename: data.imageFilename });
         onChange({ mode: "generate", imageFilename: data.imageFilename, imageUrl: data.imageUrl, imageStyle: style, imageCustomPrompt: customPrompt });
+        setBilling(data.billing || null);
       } else if (data.simulated) {
         setError("TOGETHER_API_KEY not set — add it to backend/.env to enable AI images.");
       } else {
@@ -193,6 +195,11 @@ export function ImagePanel({ postText, onChange, compact = false, forceOpen = fa
             }}
           >✕</button>
           <div style={{ marginTop: 8, fontSize: "0.68rem", color: C.supra, fontFamily: C.mono }}>✓ Image ready — will be attached to the post</div>
+          {billing && (
+            <div style={{ marginTop: 4, fontSize: "0.66rem", color: billing.free ? C.accent2 : C.warn }}>
+              {billing.free ? `Free preview (${billing.remaining} left today)` : `⬡ Charged ${billing.charged} SUPRA — daily free previews used up`}
+            </div>
+          )}
         </div>
       )}
     </Card>

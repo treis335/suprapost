@@ -5,7 +5,7 @@ const express = require("express");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const { initDB, getPricing, DEFAULT_PRICING } = require("./db");
-const { runGenerationCycle } = require("./engine");
+const { runGenerationCycle, chargeUser, consumeFreePreviewOrCharge } = require("./engine");
 const { generatePost, critiquePost, pickStyleExamples } = require("./deepseek");
 const { startAutomation, stopAutomation, resumeAllAutomations } = require("./scheduler");
 const { publishToChannels } = require("./channels");
@@ -413,10 +413,21 @@ async function main() {
     try {
       await db.read();
       const user = db.forUser(req.walletAddress);
+      const pricing = getPricing(db);
+
+      const gate = await consumeFreePreviewOrCharge(db, req.walletAddress, pricing.text ?? 1);
+      if (!gate.ok) {
+        return res.status(402).json({ ok: false, error: gate.reason === "insufficient_balance" ? "Free preview limit reached — insufficient SUPRA balance to continue generating." : "Could not process request." });
+      }
+
       const styleExamples = pickStyleExamples(user.styleLibrary, 3);
       const text = await generatePost(user.settings, styleExamples);
       const { scores, avg } = await critiquePost(text, user.settings);
-      res.json({ ok: true, post: { text, scores, avgScore: avg } });
+      res.json({
+        ok: true,
+        post: { text, scores, avgScore: avg },
+        billing: gate.free ? { free: true, remaining: gate.remaining } : { free: false, charged: gate.charged },
+      });
     } catch (err) {
       console.error(err);
       res.status(500).json({ ok: false, error: err.message });
@@ -499,34 +510,16 @@ async function main() {
     if (mode === "image" && !imageFilename) return res.status(400).json({ ok: false, error: "Image required for image mode" });
     if (mode === "both" && (!text || !imageFilename)) return res.status(400).json({ ok: false, error: "Text and image required for both mode" });
 
-    // Charge BEFORE publishing (atomic, all-or-nothing) — this is the only
-    // point in the manual Compose flow where SUPRA actually changes hands.
-    // Preview/generate steps (/api/generate, /api/image/generate) are free
-    // so the user can retry as much as they like; they only pay once they
-    // actually hit Post. Previously this route charged nothing at all,
-    // meaning manual image and text+image posts went out for free.
+    // Charge here, atomically, before publishing — this is the toll-gate
+    // for actually going out to channels. Preview generation is a separate,
+    // quota-limited free tier (see /api/generate/preview and
+    // /api/image/generate) to cover real API costs even when a user never
+    // ends up posting.
     const postId = uuidv4();
     const key = req.walletAddress.replace(/^0x/, "").toLowerCase();
     const pricing = getPricing(db);
     const modePrice = pricing[mode] ?? pricing.text ?? 1;
-
-    const chargeResult = await db.transaction((data) => {
-      const u = data.users[key];
-      if (!u) return { ok: false, reason: "user_not_found" };
-      u.wallet.creditBalance = u.wallet.creditBalance || 0;
-      const funds = +((u.wallet.balance || 0) + u.wallet.creditBalance).toFixed(8);
-      if (funds < modePrice) return { ok: false, reason: "insufficient_balance" };
-
-      let rem = modePrice;
-      const fromCredit = Math.min(u.wallet.creditBalance, rem);
-      u.wallet.creditBalance = +(u.wallet.creditBalance - fromCredit).toFixed(8);
-      rem = +(rem - fromCredit).toFixed(8);
-      u.wallet.balance = +((u.wallet.balance || 0) - rem).toFixed(8);
-      u.stats.supraEarned = +((u.stats.supraEarned || 0) + modePrice).toFixed(2);
-
-      return { ok: true, balance: u.wallet.balance, creditBalance: u.wallet.creditBalance };
-    });
-
+    const chargeResult = await chargeUser(db, req.walletAddress, modePrice);
     if (!chargeResult.ok) {
       return res.status(402).json({ ok: false, error: chargeResult.reason === "insufficient_balance" ? "Insufficient SUPRA balance for this post." : "Could not charge for this post." });
     }
@@ -572,10 +565,30 @@ async function main() {
   });
 
   app.post("/api/image/generate", requireAuth, async (req, res) => {
-    const { generateImage } = require("./imageGen");
+    const { generateImage, pickImagePromptExamples } = require("./imageGen");
     const { postText, style, customPrompt, width, height } = req.body;
-    const result = await generateImage({ postText: postText || "Web3 blockchain", style, customPrompt, width, height });
-    if (result.ok) result.imageUrl = `/images/${result.imageFilename}`;
+
+    await db.read();
+    const user = db.forUser(req.walletAddress);
+    const pricing = getPricing(db);
+
+    const gate = await consumeFreePreviewOrCharge(db, req.walletAddress, pricing.image ?? 1);
+    if (!gate.ok) {
+      return res.status(402).json({ ok: false, error: gate.reason === "insufficient_balance" ? "Free preview limit reached — insufficient SUPRA balance to continue generating." : "Could not process request." });
+    }
+
+    const styleExamples = pickImagePromptExamples(user.styleLibrary, 3);
+    const result = await generateImage({ postText: postText || "Web3 blockchain", style, customPrompt, width, height, styleExamples });
+    if (result.ok) {
+      result.imageUrl = `/images/${result.imageFilename}`;
+    } else if (!gate.free && gate.charged) {
+      // Generation failed after being charged (not a free slot) — refund.
+      await db.transaction((data) => {
+        const u = data.users[req.walletAddress.replace(/^0x/, "").toLowerCase()];
+        if (u) u.wallet.balance = +((u.wallet.balance || 0) + gate.charged).toFixed(8);
+      });
+    }
+    result.billing = gate.free ? { free: true, remaining: gate.remaining } : { free: false, charged: result.ok ? gate.charged : 0 };
     res.json(result);
   });
 
