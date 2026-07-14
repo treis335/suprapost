@@ -71,6 +71,7 @@ export function ComposePage({
   /* ── Post result ───────────────────────────────────────── */
   const [posting, setPosting]       = useState(false);
   const [postResult, setPostResult] = useState(null);
+  const [postError, setPostError]   = useState(null);
 
   /* ── Derived text (AI or manual) ───────────────────────── */
   const text = (mode === "image") ? null
@@ -97,6 +98,7 @@ export function ComposePage({
     if (!readyToPost) return;
     setPosting(true);
     setPostResult(null);
+    setPostError(null);
     const finalTargetIds = (targetIds && targetIds.length > 0) ? targetIds : null;
     const result = await onPost({
       text:          mode !== "image" ? text : null,
@@ -104,6 +106,7 @@ export function ComposePage({
       mode,
       targetIds:     finalTargetIds,
     });
+    if (!result?.ok) setPostError(result?.error || "Failed to post.");
     setPostResult(result?.post || null);
     setPosting(false);
   }
@@ -210,7 +213,7 @@ export function ComposePage({
                   />
                 </Field>
                 <Btn full variant="primary" onClick={onGenerate} disabled={generating}>
-                  {generating ? "Generating…" : `✦ Generate — ${fmt(pricing[mode] ?? wallet.costPerPost)} SUPRA`}
+                  {generating ? "Generating…" : "✦ Generate (free preview)"}
                 </Btn>
                 {tweet && (
                   <div style={{ fontSize: "0.7rem", color: C.supra, marginTop: 2 }}>
@@ -360,11 +363,16 @@ export function ComposePage({
               disabled={posting || !readyToPost || (targetIds !== null && targetIds.length === 0)}
             >
               {posting ? "Posting…" : (
-                mode === "text"  ? "🚀 Post Text" :
-                mode === "image" ? "🚀 Post Image" :
-                                   "🚀 Post Text + Image"
+                mode === "text"  ? `🚀 Post Text — ${fmt(pricing.text)} SUPRA` :
+                mode === "image" ? `🚀 Post Image — ${fmt(pricing.image)} SUPRA` :
+                                   `🚀 Post Text + Image — ${fmt(pricing.both)} SUPRA`
               )}
             </Btn>
+            {postError && (
+              <div style={{ marginTop: 10, fontSize: "0.78rem", color: C.danger, textAlign: "center" }}>
+                ✕ {postError}
+              </div>
+            )}
           </div>
 
           {/* Results */}

@@ -6,6 +6,7 @@ const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const { initDB, getPricing, DEFAULT_PRICING } = require("./db");
 const { runGenerationCycle } = require("./engine");
+const { generatePost, critiquePost, pickStyleExamples } = require("./deepseek");
 const { startAutomation, stopAutomation, resumeAllAutomations } = require("./scheduler");
 const { publishToChannels } = require("./channels");
 const { createNonce, verifyAndIssueToken, requireAuth, getPendingRef } = require("./auth");
@@ -405,6 +406,23 @@ async function main() {
   // ════════════════════════════════════════════════════════
   // GENERATE — manual single generation (from "Generate" tab)
   // ════════════════════════════════════════════════════════
+  // Free text preview for manual Compose — draft/regenerate as much as you
+  // like without being charged. The only charge for the manual flow happens
+  // in POST /api/post, right when the user actually publishes.
+  app.post("/api/generate/preview", requireAuth, async (req, res) => {
+    try {
+      await db.read();
+      const user = db.forUser(req.walletAddress);
+      const styleExamples = pickStyleExamples(user.styleLibrary, 3);
+      const text = await generatePost(user.settings, styleExamples);
+      const { scores, avg } = await critiquePost(text, user.settings);
+      res.json({ ok: true, post: { text, scores, avgScore: avg } });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   app.post("/api/generate", requireAuth, async (req, res) => {
     try {
       const { autoPost, mode, imageStyle, imageCustomPrompt, targetIds } = req.body;
@@ -475,14 +493,46 @@ async function main() {
   //   mode: "text" | "image" | "both"
   //   targetIds: ["telegram","discord"] — optional per-post channel override
   app.post("/api/post", requireAuth, async (req, res) => {
-    await db.read();
-    const user = db.forUser(req.walletAddress);
     const { text, imageFilename, mode = "text", targetIds } = req.body;
 
     if (mode === "text" && !text)  return res.status(400).json({ ok: false, error: "Text required for text mode" });
     if (mode === "image" && !imageFilename) return res.status(400).json({ ok: false, error: "Image required for image mode" });
     if (mode === "both" && (!text || !imageFilename)) return res.status(400).json({ ok: false, error: "Text and image required for both mode" });
 
+    // Charge BEFORE publishing (atomic, all-or-nothing) — this is the only
+    // point in the manual Compose flow where SUPRA actually changes hands.
+    // Preview/generate steps (/api/generate, /api/image/generate) are free
+    // so the user can retry as much as they like; they only pay once they
+    // actually hit Post. Previously this route charged nothing at all,
+    // meaning manual image and text+image posts went out for free.
+    const postId = uuidv4();
+    const key = req.walletAddress.replace(/^0x/, "").toLowerCase();
+    const pricing = getPricing(db);
+    const modePrice = pricing[mode] ?? pricing.text ?? 1;
+
+    const chargeResult = await db.transaction((data) => {
+      const u = data.users[key];
+      if (!u) return { ok: false, reason: "user_not_found" };
+      u.wallet.creditBalance = u.wallet.creditBalance || 0;
+      const funds = +((u.wallet.balance || 0) + u.wallet.creditBalance).toFixed(8);
+      if (funds < modePrice) return { ok: false, reason: "insufficient_balance" };
+
+      let rem = modePrice;
+      const fromCredit = Math.min(u.wallet.creditBalance, rem);
+      u.wallet.creditBalance = +(u.wallet.creditBalance - fromCredit).toFixed(8);
+      rem = +(rem - fromCredit).toFixed(8);
+      u.wallet.balance = +((u.wallet.balance || 0) - rem).toFixed(8);
+      u.stats.supraEarned = +((u.stats.supraEarned || 0) + modePrice).toFixed(2);
+
+      return { ok: true, balance: u.wallet.balance, creditBalance: u.wallet.creditBalance };
+    });
+
+    if (!chargeResult.ok) {
+      return res.status(402).json({ ok: false, error: chargeResult.reason === "insufficient_balance" ? "Insufficient SUPRA balance for this post." : "Could not charge for this post." });
+    }
+
+    await db.read();
+    const user = db.forUser(req.walletAddress);
     const imagePath = imageFilename ? require("path").join(require("./imageGen").IMAGES_DIR, imageFilename) : null;
     const payload = { text, imagePath, mode };
     const targets = Array.isArray(targetIds) && targetIds.length ? targetIds : null;
@@ -491,7 +541,7 @@ async function main() {
     const anyPosted = Object.values(results).some((r) => r.ok);
 
     const post = {
-      id: uuidv4(),
+      id: postId,
       mode,
       text: text || null,
       imageFilename: imageFilename || null,
@@ -500,12 +550,17 @@ async function main() {
       auto: false,
       results,
     };
-    user.posts.unshift(post);
-    if (user.posts.length > 30) user.posts = user.posts.slice(0, 30);
-    if (anyPosted) user.stats.totalPosts += 1;
-    await db.write();
 
-    res.json({ ok: true, post, results });
+    await db.transaction((data) => {
+      const u = data.users[key];
+      if (!u) return;
+      u.posts = u.posts || [];
+      u.posts.unshift(post);
+      if (u.posts.length > 30) u.posts = u.posts.slice(0, 30);
+      if (anyPosted) u.stats.totalPosts = (u.stats.totalPosts || 0) + 1;
+    });
+
+    res.json({ ok: true, post, results, wallet: { balance: chargeResult.balance, creditBalance: chargeResult.creditBalance } });
   });
 
   // ════════════════════════════════════════════════════════

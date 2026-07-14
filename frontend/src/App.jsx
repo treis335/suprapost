@@ -978,19 +978,15 @@ export default function App() {
   async function handleGenerate(opts = {}) {
     setGenerating(true); setGenLog([]); setTweet(""); setScores([]);
     try {
-      const data = await api.post("/generate", { autoPost: false, mode: "text", ...opts });
+      // Free preview — Compose only charges once, at actual publish time
+      // (see onPost / POST /api/post). This just drafts text to review.
+      const data = await api.post("/generate/preview", {});
       if (data.ok && data.post) {
         setTweet(data.post.text);
         if (data.post.scores) setScores(data.post.scores);
-        if (data.log) setGenLog(data.log);
-        setStats(s => ({ ...s, totalGenerations: (s.totalGenerations || 0) + 1 }));
-        // Fetch real balance from server — do it twice (immediate + 2s later)
-        // to handle any backend async processing delay.
-        api.get("/wallet").then(w => { if (!w.unauthorized) setWallet(w); }).catch(() => {});
-        setTimeout(() => {
-          api.get("/wallet").then(w => { if (!w.unauthorized) setWallet(w); }).catch(() => {});
-        }, 2000);
-      } else if (data.log) setGenLog(data.log);
+      } else if (data.error) {
+        setGenLog([{ time: new Date().toISOString(), msg: `✕ Error: ${data.error}` }]);
+      }
     } catch (err) { setGenLog([{ time: new Date().toISOString(), msg: `✕ Error: ${err.message}` }]); }
     setGenerating(false);
   }
@@ -1000,6 +996,8 @@ export default function App() {
       const result = await api.post("/post", payload);
       if (result.post) setPosts(p => [result.post, ...p]);
       if (result.ok) setStats(s => ({ ...s, totalPosts: (s.totalPosts || 0) + 1 }));
+      if (result.wallet) setWallet(w => ({ ...w, ...result.wallet }));
+      else if (result.ok) api.get("/wallet").then(w => { if (!w.unauthorized) setWallet(w); }).catch(() => {});
       return result;
     } catch (err) { return { ok: false, error: err.message }; }
   }
