@@ -64,6 +64,13 @@ function freshUserData() {
       referrals: [],         // list of wallets this user has referred
     },
     posts: [], // { id, text, scores, time, auto, results: { telegram: {...}, twitter: {...} } }
+    // Permanent style memory — survives even when `posts` gets trimmed to the
+    // last 30. This is the only thing future generations actually learn
+    // from long-term. Capped separately from the rolling history.
+    styleLibrary: {
+      textExamples:  [], // { text, avgScore, addedAt }
+      imagePrompts:  [], // { prompt, avgScore, addedAt }
+    },
   };
 }
 
@@ -172,6 +179,7 @@ class JsonDB {
     }
     const u = this.data.users[key];
     if (u.wallet && u.wallet.creditBalance === undefined) u.wallet.creditBalance = 0;
+    if (!u.styleLibrary) u.styleLibrary = { textExamples: [], imagePrompts: [] };
     return u;
   }
 }

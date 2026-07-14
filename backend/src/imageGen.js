@@ -21,8 +21,19 @@ const STYLES = {
   retro:         { label: "Retro Futurism",       suffix: "Retro-futurism, 80s synthwave, chrome typography, starfield, vivid pink and teal." },
 };
 
+// Picks the best-rated past image prompts from the permanent style library
+// (survives history trimming) to nudge future prompts toward what worked.
+function pickImagePromptExamples(styleLibrary, limit = 3) {
+  const entries = styleLibrary?.imagePrompts || [];
+  return entries
+    .slice()
+    .sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0))
+    .slice(0, limit)
+    .map(e => e.prompt);
+}
+
 // ── Prompt builder ────────────────────────────────────────────────────────────
-async function buildImagePrompt(postText, style = "auto", customPrompt = "") {
+async function buildImagePrompt(postText, style = "auto", customPrompt = "", styleExamples = []) {
   if (customPrompt) return `${customPrompt} ${STYLES[style]?.suffix || ""}`.trim();
 
   const apiKey     = process.env.DEEPSEEK_API_KEY;
@@ -30,6 +41,10 @@ async function buildImagePrompt(postText, style = "auto", customPrompt = "") {
   const fallback   = `Futuristic blockchain network visualization, glowing nodes, data streams, dark background with purple and cyan highlights. ${styleSuffix}`;
 
   if (!apiKey) return fallback;
+
+  const learnedNote = styleExamples.length
+    ? `\n\nPrompts that produced the user's best-performing past images — echo their composition/mood, but don't copy verbatim:\n${styleExamples.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+    : "";
 
   try {
     const res = await axios.post(
@@ -43,7 +58,8 @@ async function buildImagePrompt(postText, style = "auto", customPrompt = "") {
               "You are a visual art director specialising in social media content for crypto and Web3. " +
               "Convert a social media post into a concise, vivid image generation prompt. " +
               "Rules: max 80 words, return ONLY the prompt (no quotes, no explanation), " +
-              "no text inside the image, strong composition, colours that pop on mobile screens.",
+              "no text inside the image, strong composition, colours that pop on mobile screens." +
+              learnedNote,
           },
           {
             role: "user",
@@ -110,7 +126,7 @@ async function generateWithTogether(prompt) {
 }
 
 // ── Main generateImage ────────────────────────────────────────────────────────
-async function generateImage({ postText = "", style = "auto", customPrompt = "", modo_economico = false }) {
+async function generateImage({ postText = "", style = "auto", customPrompt = "", modo_economico = false, styleExamples = [] }) {
   const hasTogether = !!process.env.TOGETHER_API_KEY;
 
   if (!hasTogether) {
@@ -118,7 +134,7 @@ async function generateImage({ postText = "", style = "auto", customPrompt = "",
     return { ok: false, simulated: true, error: "No image API key configured" };
   }
 
-  const prompt = await buildImagePrompt(postText, style, customPrompt);
+  const prompt = await buildImagePrompt(postText, style, customPrompt, styleExamples);
   console.log(`[imageGen] Prompt: "${prompt.slice(0, 90)}…"`);
 
   try {
@@ -153,4 +169,4 @@ function cleanOldImages(maxAgeDays = 7) {
   } catch {}
 }
 
-module.exports = { generateImage, saveUploadedImage, cleanOldImages, STYLES, IMAGES_DIR };
+module.exports = { generateImage, saveUploadedImage, cleanOldImages, STYLES, IMAGES_DIR, pickImagePromptExamples };

@@ -1231,7 +1231,7 @@ export default function App() {
                       ))}
                     </div>
                   )}
-                  {p.text && (
+                  {(p.text || p.imageUrl) && (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 11, paddingTop: 11, borderTop: `1px solid ${C.border}` }}>
                       <span style={{ fontSize: "0.68rem", color: C.muted }}>Rate this style:</span>
                       <button onClick={() => ratePost(p.id, p.rating === "up" ? null : "up")}

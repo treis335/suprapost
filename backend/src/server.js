@@ -594,6 +594,13 @@ async function main() {
   // generations which of the user's own posts to imitate (see
   // deepseek.js's pickStyleExamples). Uses a transaction so this can never
   // race with a generation cycle writing a new post at the same time.
+  // POST /api/posts/:id/rating — 👍/👎 feedback used to teach future
+  // generations which of the user's own posts (and image prompts) to
+  // imitate. A 👍 copies the content into the PERMANENT styleLibrary (which
+  // survives the rolling 30-post history being trimmed) — that's the only
+  // thing pickStyleExamples/pickImagePromptExamples actually read from.
+  const MAX_LIBRARY_ENTRIES = 12;
+
   app.post("/api/posts/:id/rating", requireAuth, async (req, res) => {
     const { rating } = req.body; // "up" | "down" | null
     if (![ "up", "down", null ].includes(rating)) {
@@ -605,6 +612,28 @@ async function main() {
       const post = u?.posts?.find(p => p.id === req.params.id);
       if (!post) return { ok: false };
       post.rating = rating;
+
+      u.styleLibrary = u.styleLibrary || { textExamples: [], imagePrompts: [] };
+      u.styleLibrary.textExamples = u.styleLibrary.textExamples || [];
+      u.styleLibrary.imagePrompts = u.styleLibrary.imagePrompts || [];
+
+      // Always remove any prior library entry sourced from this post first
+      // (covers 👍 → 👎 changes, or re-rating).
+      u.styleLibrary.textExamples = u.styleLibrary.textExamples.filter(e => e.sourcePostId !== post.id);
+      u.styleLibrary.imagePrompts = u.styleLibrary.imagePrompts.filter(e => e.sourcePostId !== post.id);
+
+      if (rating === "up") {
+        if (post.text) {
+          u.styleLibrary.textExamples.push({ text: post.text, avgScore: post.avgScore || 0, sourcePostId: post.id, addedAt: Date.now() });
+          u.styleLibrary.textExamples.sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0));
+          u.styleLibrary.textExamples = u.styleLibrary.textExamples.slice(0, MAX_LIBRARY_ENTRIES);
+        }
+        if (post.imagePrompt) {
+          u.styleLibrary.imagePrompts.push({ prompt: post.imagePrompt, avgScore: post.avgScore || 0, sourcePostId: post.id, addedAt: Date.now() });
+          u.styleLibrary.imagePrompts.sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0));
+          u.styleLibrary.imagePrompts = u.styleLibrary.imagePrompts.slice(0, MAX_LIBRARY_ENTRIES);
+        }
+      }
       return { ok: true };
     });
     if (!result.ok) return res.status(404).json({ ok: false, error: "Post not found" });

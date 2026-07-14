@@ -153,21 +153,18 @@ Return ONLY this JSON, nothing else: {"relevance": X, "engagement": X, "clarity"
 }
 
 /**
- * Picks the best-performing recent posts to feed back in as style examples.
- * "Best" = user gave a 👍, or (if no feedback yet) the highest real
- * self-critique average. Only text-bearing posts are eligible.
+ * Picks the best-performing text examples to feed back in as style
+ * guidance. Reads from the user's permanent styleLibrary — NOT the rolling
+ * `posts` history, which gets trimmed to the last 30 and would otherwise
+ * lose good examples over time.
  */
-function pickStyleExamples(posts = [], limit = 3) {
-  const eligible = (posts || []).filter(p => p.text);
-  const scored = eligible.map(p => ({
-    text: p.text,
-    weight: (p.rating === "up" ? 100 : p.rating === "down" ? -100 : 0) + (p.avgScore || 0),
-  }));
-  return scored
-    .filter(p => p.weight > 0 || p.weight === 0) // exclude down-rated (negative weight)
-    .sort((a, b) => b.weight - a.weight)
+function pickStyleExamples(styleLibrary, limit = 3) {
+  const entries = styleLibrary?.textExamples || [];
+  return entries
+    .slice()
+    .sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0))
     .slice(0, limit)
-    .map(p => p.text);
+    .map(e => e.text);
 }
 
 module.exports = { generatePost, critiquePost, pickStyleExamples };

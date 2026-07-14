@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require("uuid");
 const { generatePost, critiquePost, pickStyleExamples } = require("./deepseek");
-const { generateImage } = require("./imageGen");
+const { generateImage, pickImagePromptExamples } = require("./imageGen");
 const { publishToChannels } = require("./channels");
 const { getPricing, freshUserData } = require("./db");
 const path = require("path");
@@ -69,7 +69,7 @@ async function runGenerationCycleLocked(db, address, opts = {}) {
   let text = null;
   if (mode === "text" || mode === "both") {
     push("🤖 Generating text via DeepSeek...");
-    const styleExamples = pickStyleExamples(user.posts, 3);
+    const styleExamples = pickStyleExamples(user.styleLibrary, 3);
     if (styleExamples.length) push(`📚 Learning from ${styleExamples.length} of your top-performing past posts`);
     text = await generatePost(settings, styleExamples);
     push("✓ Text generated");
@@ -78,19 +78,24 @@ async function runGenerationCycleLocked(db, address, opts = {}) {
   // ── Image (slow, external API — deliberately outside any DB lock) ────────
   let imagePath     = null;
   let imageFilename = null;
+  let imagePrompt   = null;
   let imageFailed   = false;
 
   if (mode === "image" || mode === "both") {
     push(`🖼 Generating image (style: ${imageStyle})...`);
+    const imageExamples = pickImagePromptExamples(user.styleLibrary, 3);
+    if (imageExamples.length) push(`📚 Learning from ${imageExamples.length} of your top-rated past images`);
     const result = await generateImage({
       postText:     text || settings.niche || "Web3 blockchain crypto",
       style:        imageStyle,
       customPrompt: imageCustomPrompt,
       modo_economico: opts.modo_economico ?? true,
+      styleExamples: imageExamples,
     });
     if (result.ok) {
       imagePath     = result.imagePath;
       imageFilename = result.imageFilename;
+      imagePrompt   = result.prompt || null;
       push(`✓ Image ready → ${imageFilename}`);
     } else {
       imageFailed = true;
@@ -140,6 +145,7 @@ async function runGenerationCycleLocked(db, address, opts = {}) {
       mode,
       text,
       imageUrl: imageFilename ? `/images/${imageFilename}` : null,
+      imagePrompt,
       avgScore: avg,
       rating:   null, // "up" | "down" | null — set later by the user in History
       time:     new Date().toISOString(),
